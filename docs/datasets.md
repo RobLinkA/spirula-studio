@@ -608,6 +608,12 @@ compensated. The selected dataset camera or sparse-point
 center becomes the origin; it is not recomputed from evolving splat bounds.
 Navigation and Reset view do not change the export transform.
 
+The native viewport changes both the live and reset camera poses when switching
+between Z-up and Y-up. Turntable navigation orbits about the selected world up,
+keeps the horizon level, and limits pitch to 89 degrees. Trackball allows roll.
+The XYZ model rotations use the selected frame's fixed axes and do not rotate
+the navigation up axis.
+
 **Generate snapshot** exports the current model during training, while paused,
 or after completion. It takes the engine lock at a step boundary and writes
 `snapshot-<completed-step>-<timestamp>-<counter>/splat.ply` beneath the run

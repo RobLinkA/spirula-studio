@@ -62,14 +62,15 @@ void fov_to_intrinsics(float fov_deg, int w, int h, const char* model,
 // ---------------------------------------------------------------------------
 
 void ViewportPanel::reset_pose(float radius) {
-    // The web viewer's cam.reset() about the chosen centre: target = centre,
-    // pos = centre + [0,0,1], then orbit(0, -250).
     float c[3];
     center_shared(c);
-    _cam.pos[0] = c[0]; _cam.pos[1] = c[1]; _cam.pos[2] = c[2] + 1.0f;
-    _cam.rot[0] = _cam.rot[1] = _cam.rot[2] = 0; _cam.rot[3] = 1;
-    _cam.target[0] = c[0]; _cam.target[1] = c[1]; _cam.target[2] = c[2];
-    _cam.orbit(0, -250);
+    _cam.up_axis = _training_transform && _coordinates != SnapshotCoordinates::ZUp ? 1 : 2;
+    float eye[3] = {c[0], c[1], c[2]}, up[3] = {};
+    up[_cam.up_axis] = 1;
+    eye[_cam.up_axis] += std::cos(1.25f);
+    const int ground_axis = _cam.up_axis == 2 ? 1 : 2;
+    eye[ground_axis] += (_cam.up_axis == 2 ? -1.0f : 1.0f) * std::sin(1.25f);
+    _cam.look_at(eye, c, up);
     _home = _cam;
     _home_dist = radius;
     _dirty = true;
@@ -88,7 +89,17 @@ void ViewportPanel::coordinate_basis(float out[9]) const {
 
 void ViewportPanel::set_coordinates(SnapshotCoordinates coordinates) {
     if (_coordinates == coordinates) return;
+    float old_basis[9], new_basis[9];
+    coordinate_basis(old_basis);
     _coordinates = coordinates;
+    coordinate_basis(new_basis);
+    float delta[9] = {};
+    for (int r = 0; r < 3; ++r)
+        for (int c = 0; c < 3; ++c)
+            for (int k = 0; k < 3; ++k)
+                delta[r*3+c] += new_basis[r*3+k] * old_basis[c*3+k];
+    _cam.rotate_world(delta);
+    _home.rotate_world(delta);
     _cam.up_axis = coordinates == SnapshotCoordinates::ZUp ? 2 : 1;
     _home.up_axis = _cam.up_axis;
     rebuild_m2s();
@@ -881,15 +892,21 @@ void ViewportPanel::draw_controls(bool engine) {
         place(text_w(msg::snapshot_rotation.get()));
         ui::Text(msg::snapshot_rotation);
         const char* axes[] = {"X", "Y", "Z"};
+        const char* axis_ids[] = {"##rotation_x", "##rotation_y", "##rotation_z"};
         for (int i = 0; i < 3; ++i) {
             place(px(74.0f) + st.ItemInnerSpacing.x + text_w(axes[i]));
+            ImGui::BeginGroup();
+            ImGui::AlignTextToFramePadding();
+            ui::TextRaw(axes[i]);
+            ImGui::SameLine(0, st.ItemInnerSpacing.x);
             ImGui::SetNextItemWidth(px(74.0f));
-            if (ui::InputFloatRaw(axes[i], &_rotation_degrees[i], "%.2f")) {
+            if (ui::InputFloatRaw(axis_ids[i], &_rotation_degrees[i], "%.2f")) {
                 if (!std::isfinite(_rotation_degrees[i])) _rotation_degrees[i] = 0;
                 rebuild_m2s();
                 _dirty = true;
             }
             ui::help_on_hover(msg::snapshot_rotation_help);
+            ImGui::EndGroup();
         }
         const auto& button = _snapshot_busy ? msg::snapshot_exporting : msg::snapshot_export;
         place(button_w(button));
@@ -999,9 +1016,7 @@ void ViewportPanel::draw_controls(bool engine) {
     if (_training_transform && !_snapshot_status.empty()) ui::TextWrappedRaw(_snapshot_status.c_str());
 }
 
-// The four modes behave exactly as the web viewer's do; only the words are
-// localized. The tooltip names them by substitution so it always uses the same
-// words the combo just showed.
+// The tooltip uses the same localized mode names as the combo.
 void ViewportPanel::draw_nav_controls() {
     const ImGuiStyle& st = ImGui::GetStyle();
     const float row_w = ImGui::GetContentRegionAvail().x;

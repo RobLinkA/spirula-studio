@@ -134,8 +134,7 @@ private:
     enum class Mode { None, Preview, Engine };
 
     void compute_framing(const spirula::TrainerSession& session);
-    // The client-frame default pose (web viewer cam.reset() + orbit(0,-250)),
-    // about the chosen centre.
+    // Default pose about the chosen centre, upright in the selected frame.
     void reset_pose(float radius);
     // The centering choices, in the model frame. `has_cameras` says whether
     // the camera statistics are real or fell back to the point ones.
