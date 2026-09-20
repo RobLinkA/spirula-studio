@@ -196,8 +196,6 @@ void ViewportPanel::set_model_transform(const float a[12]) {
     _dirty = true;
 }
 
-// owner placement composed with the levelling correction, which is R_align
-// transposed when the parsers' up guess is switched off and nothing otherwise.
 void ViewportPanel::rebuild_m2s() {
     const float* o = _m2s_owner;
     _m2s_scale = std::sqrt(o[0]*o[0] + o[4]*o[4] + o[8]*o[8]);
@@ -214,8 +212,72 @@ void ViewportPanel::rebuild_m2s() {
         }
         _m2s[r*4+3] = o[r*4+3];
     }
+    if (_training_transform) {
+        const double radians = 3.14159265358979323846 / 180.0;
+        const double angles[3] = {std::remainder((double)_rotation_degrees[2], 360.0)*radians,
+                                  std::remainder((double)_rotation_degrees[1], 360.0)*radians,
+                                  std::remainder((double)_rotation_degrees[0], 360.0)*radians};
+        double R[9];
+        spirula::euler_intrinsic_to_rotation("zyx", angles, R);
+        float base[12];
+        std::copy(_m2s, _m2s + 12, base);
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) {
+                double v = 0;
+                for (int k = 0; k < 3; ++k) v += R[r*3+k]*base[k*4+c];
+                _m2s[r*4+c] = (float)v;
+            }
+            _m2s[r*4+3] = 0;
+            if (_centers_known)
+                for (int k = 0; k < 3; ++k)
+                    _m2s[r*4+3] -= _m2s[r*4+k]*_centers[_center_mode][k];
+        }
+    }
     static const float kI[12] = {1,0,0,0, 0,1,0,0, 0,0,1,0};
     _m2s_identity = std::memcmp(_m2s, kI, sizeof kI) == 0;
+}
+
+void ViewportPanel::attach_training_transform(const spirula::TrainerSession& session, bool first) {
+    const auto& ds = session.ds;
+    _training_transform = true;
+    _snapshot_translation_scale = session.cfg.relative_scale.value_or(1.0f);
+    if (first) std::fill(_rotation_degrees, _rotation_degrees + 3, 0.0f);
+    const auto centers = dsparse::scene_centers(ds);
+    set_centers(&centers, ds.num_cameras > 0);
+    double T[16];
+    for (int i = 0; i < 16; ++i)
+        T[i] = ds.train_frame_scale != 1.0f ? ds.train_to_normalized[i] : (i % 5 == 0);
+    dsparse::invert_affine4x4(T, _normalized_from_training);
+    adopt_gauge(ds, first);
+    const NavCamera live = _cam;
+    reset_pose(_home_dist);
+    if (!first) _cam = live;
+}
+
+spirula::SceneTransform ViewportPanel::snapshot_transform() const {
+    spirula::SceneTransform transform;
+    double A[12]{};
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 4; ++c)
+            for (int k = 0; k < 3; ++k)
+                A[r*4+c] += _m2s[r*4+k]*_normalized_from_training[k*4+c];
+        A[r*4+3] += _m2s[r*4+3];
+    }
+    // Navigation normalizes scene size; the exported PLY keeps training units.
+    const double scale = std::sqrt(A[0]*A[0] + A[4]*A[4] + A[8]*A[8]);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) transform.R[r*3+c] = A[r*4+c] / scale;
+        transform.t[r] = A[r*4+3] / scale * _snapshot_translation_scale;
+    }
+    return transform;
+}
+
+void ViewportPanel::set_snapshot_exporter(
+    std::function<void(const spirula::SceneTransform&)> exporter,
+    bool busy, const std::string& status) {
+    _snapshot_exporter = std::move(exporter);
+    _snapshot_busy = busy;
+    _snapshot_status = status;
 }
 
 void ViewportPanel::adopt_gauge(const ParsedDataset& ds, bool first) {
@@ -357,7 +419,7 @@ void ViewportPanel::attach_preview(spirula::TrainerSession& session) {
         _last_error = "preview renderer unavailable (OpenGL 3.2 required)";
         return;
     }
-    adopt_gauge(session.ds, maybe_frame(session));
+    attach_training_transform(session, maybe_frame(session));
     _last_error.clear();
     _mode = Mode::Preview;
 }
@@ -444,7 +506,7 @@ void ViewportPanel::attach(spirula::TrainerSession& session) {
     _buffer_keys = _worker.buffer_keys();
     _buffer_idx = std::min<int>(_buffer_idx, (int)_buffer_keys.size() - 1);
     _has_cameras = session.ds.num_cameras > 0;
-    adopt_gauge(session.ds, maybe_frame(session));
+    attach_training_transform(session, maybe_frame(session));
     _pending = 0;
     _last_error.clear();
     _mode = Mode::Engine;
@@ -476,6 +538,10 @@ void ViewportPanel::attach_scene(const ViewerRenderConfig& cfg,
 }
 
 void ViewportPanel::detach() {
+    _training_transform = false;
+    _snapshot_exporter = nullptr;
+    _snapshot_status.clear();
+    rebuild_m2s();
     _scene_options = false;
     _apply_color_space = nullptr;
     _on_primitive_changed = nullptr;
@@ -731,8 +797,7 @@ void ViewportPanel::draw_controls(bool engine) {
                 if (ui::SelectableRaw(center_label(i), i == _center_mode) &&
                     i != _center_mode) {
                     _center_mode = i;
-                    // The model stays where it is; the pivot moves to the new
-                    // centre, and so does the pose Reset view returns to.
+                    if (_training_transform) rebuild_m2s();
                     float c[3];
                     center_shared(c);
                     recenter_at(c);
@@ -743,7 +808,28 @@ void ViewportPanel::draw_controls(bool engine) {
             }
             ImGui::EndCombo();
         }
-        ui::help_on_hover(msg::viewport_center_help);
+        ui::help_on_hover(_training_transform ? msg::snapshot_center_help : msg::viewport_center_help);
+    }
+    if (_training_transform) {
+        place(text_w(msg::snapshot_rotation.get()));
+        ui::Text(msg::snapshot_rotation);
+        const char* axes[] = {"X", "Y", "Z"};
+        for (int i = 0; i < 3; ++i) {
+            place(px(74.0f) + st.ItemInnerSpacing.x + text_w(axes[i]));
+            ImGui::SetNextItemWidth(px(74.0f));
+            if (ui::InputFloatRaw(axes[i], &_rotation_degrees[i], "%.2f")) {
+                if (!std::isfinite(_rotation_degrees[i])) _rotation_degrees[i] = 0;
+                rebuild_m2s();
+                _dirty = true;
+            }
+            ui::help_on_hover(msg::snapshot_rotation_help);
+        }
+        const auto& button = _snapshot_busy ? msg::snapshot_exporting : msg::snapshot_export;
+        place(button_w(button));
+        ImGui::BeginDisabled(!_snapshot_exporter || _snapshot_busy);
+        if (ui::Button(button)) _snapshot_exporter(snapshot_transform());
+        ImGui::EndDisabled();
+        ui::help_on_hover(msg::snapshot_export_help);
     }
     if (engine) {
         place(px(66.0f) + st.ItemInnerSpacing.x +
@@ -843,6 +929,7 @@ void ViewportPanel::draw_controls(bool engine) {
     }
 
     if (_nav_controls) draw_nav_controls();
+    if (_training_transform && !_snapshot_status.empty()) ui::TextWrappedRaw(_snapshot_status.c_str());
 }
 
 // The four modes behave exactly as the web viewer's do; only the words are

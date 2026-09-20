@@ -5,8 +5,11 @@
 #include "backend/api/BackendRuntime.h"
 #include "engine/Engine.h"
 #include "i18n/catalog/Log.h"
+#include "i18n/catalog/Gui.h"
+#include "data/JsonWrite.h"
 
 #include <algorithm>
+#include <fstream>
 
 namespace gui {
 
@@ -86,7 +89,88 @@ void TrainRunner::request_stop(bool save) {
 void TrainRunner::shutdown() {
     request_stop();
     join_worker();
+    if (_snapshot_worker.joinable()) _snapshot_worker.join();
     if (_web_viewer) { _web_viewer->stop(); _web_viewer.reset(); }
+}
+
+void TrainRunner::note_engine_taken() {
+    if (_snapshot_worker.joinable()) _snapshot_worker.join();
+    _engine_ready = false;
+}
+
+std::string TrainRunner::snapshot_message() {
+    std::lock_guard<std::mutex> lk(_mu);
+    return _snapshot_message;
+}
+
+void TrainRunner::export_snapshot(const spirula::SceneTransform& transform) {
+    if (!_session || !engine_ready() || snapshot_busy()) return;
+    if (_snapshot_worker.joinable()) _snapshot_worker.join();
+    {
+        std::lock_guard<std::mutex> lk(_mu);
+        _snapshot_message.clear();
+    }
+    TrainerSession* session = _session.get();
+    _snapshot_busy = true;
+    session->snapshot_pending = true;
+    try {
+        _snapshot_worker = std::thread([this, session, transform] {
+            struct Finish {
+                std::atomic<bool>& pending;
+                std::atomic<bool>& busy;
+                ~Finish() { pending = false; busy = false; }
+            } finish{session->snapshot_pending, _snapshot_busy};
+            std::string message;
+            namespace fs = std::filesystem;
+            namespace msg = spirula::i18n::msg::gui;
+            fs::path partial;
+            try {
+                std::lock_guard<std::mutex> engine_lock(session->engine_mutex);
+                const int step = session->cur_step.load();
+                const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                fs::path folder;
+                for (int attempt = 0;; ++attempt) {
+                    folder = session->out_dir / ("snapshot-" + std::to_string(step) + "-" +
+                        std::to_string(stamp) + "-" + std::to_string(attempt));
+                    if (fs::create_directory(folder)) break;
+                }
+                partial = folder / "splat.partial.ply";
+                engine_export_ply(partial.u8string(), &transform);
+                JsonWriter metadata;
+                metadata.object().field("format", "spirula-snapshot-transform").field("version", 1)
+                    .field("step", step).field("convention", "p_snapshot = R * p_training + t; original scene units")
+                    .key("rotation_row_major").array();
+                for (double v : transform.R) metadata.value(v);
+                metadata.end().key("translation").array();
+                for (double v : transform.t) metadata.value(v);
+                metadata.end().end();
+                std::ofstream info(folder / "transform.json", std::ios::binary);
+                info.exceptions(std::ios::failbit | std::ios::badbit);
+                info << metadata.str();
+                info.close();
+                const fs::path target = folder / "splat.ply";
+                fs::rename(partial, target);
+                message = spirula::i18n::format(msg::snapshot_saved, {target.u8string()});
+            } catch (const std::exception& e) {
+                if (!partial.empty()) {
+                    std::error_code ec;
+                    fs::remove(partial, ec);
+                }
+                message = spirula::i18n::format(msg::snapshot_failed, {e.what()});
+            }
+            {
+                std::lock_guard<std::mutex> lk(_mu);
+                _snapshot_message = message;
+            }
+            push_log(message);
+        });
+    } catch (const std::exception& e) {
+        session->snapshot_pending = false;
+        _snapshot_busy = false;
+        std::lock_guard<std::mutex> lk(_mu);
+        _snapshot_message = spirula::i18n::format(spirula::i18n::msg::gui::snapshot_failed, {e.what()});
+    }
 }
 
 void TrainRunner::release_engine() {
@@ -102,6 +186,7 @@ void TrainRunner::load_dataset(const TrainConfig& cfg, const std::string& preset
     {
         std::lock_guard<std::mutex> lk(_mu);
         _error.clear();
+        _snapshot_message.clear();
     }
     _session.reset(new TrainerSession());
     _session->cfg = cfg;
@@ -128,6 +213,7 @@ void TrainRunner::start_training(const TrainConfig& cfg, const std::string& pres
     {
         std::lock_guard<std::mutex> lk(_mu);
         _error.clear();
+        _snapshot_message.clear();
         _latest = {};
         _latencies.clear();
         _metrics.clear();
