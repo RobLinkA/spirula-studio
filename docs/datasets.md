@@ -602,8 +602,8 @@ gives each group its old weight, so review the new rows before starting.
 
 The training viewport's center selector and X/Y/Z degree fields define a new
 coordinate frame. Rotation applies around fixed X, then Y, then Z axes, after
-the camera-leveling setting. The coordinate selector keeps Spirula's Z-up
-frame, converts to Y-up, or prepares a SuperSplat PLY with its import rotation
+the camera-leveling setting. The coordinate selector defaults to Y-up, and also
+offers Spirula's Z-up frame or a SuperSplat PLY with its import rotation
 compensated. The selected dataset camera or sparse-point
 center becomes the origin; it is not recomputed from evolving splat bounds.
 Navigation and Reset view do not change the export transform.

@@ -10,7 +10,7 @@ inline constexpr SnapshotCoordinates snapshot_default_coordinates() {
 #ifdef SS_DEFAULT_SNAPSHOT_SUPERSPLAT
     return SnapshotCoordinates::SuperSplat;
 #else
-    return SnapshotCoordinates::ZUp;
+    return SnapshotCoordinates::YUp;
 #endif
 }
 
