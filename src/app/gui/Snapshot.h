@@ -6,6 +6,14 @@ namespace gui {
 
 enum class SnapshotCoordinates { ZUp, YUp, SuperSplat };
 
+inline constexpr SnapshotCoordinates snapshot_default_coordinates() {
+#ifdef SS_DEFAULT_SNAPSHOT_SUPERSPLAT
+    return SnapshotCoordinates::SuperSplat;
+#else
+    return SnapshotCoordinates::ZUp;
+#endif
+}
+
 inline const char* snapshot_coordinates_name(SnapshotCoordinates coordinates) {
     switch (coordinates) {
         case SnapshotCoordinates::YUp: return "y-up";
@@ -16,7 +24,7 @@ inline const char* snapshot_coordinates_name(SnapshotCoordinates coordinates) {
 
 struct SnapshotExport {
     spirula::SceneTransform transform;
-    SnapshotCoordinates coordinates = SnapshotCoordinates::ZUp;
+    SnapshotCoordinates coordinates = snapshot_default_coordinates();
 };
 
 }  // namespace gui

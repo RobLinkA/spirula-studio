@@ -616,16 +616,20 @@ the navigation up axis.
 
 **Generate snapshot** exports the current model during training, while paused,
 or after completion. It takes the engine lock at a step boundary and writes
-`snapshot-<completed-step>-<timestamp>-<counter>/splat.ply` beneath the run
-directory, alongside a `transform.json` recording the training-to-snapshot
-rotation, translation, and selected coordinate system. Preview and export use the same orientation and
+`<dataset-name>_YYYYMMDD_HHMMSS.ply` directly in the dataset root. The date and
+time are local to the computer, captured when the button is clicked. Repeated
+names receive `_1`, `_2`, etc. without replacing earlier snapshots.
+The matching `.transform.json` records the training-to-snapshot rotation,
+translation, selected coordinate system and training configuration.
+Preview and export use the same orientation and
 center; export preserves training-frame size. Gaussian orientations and
 directional SH colors rotate with positions.
 
 Snapshots leave live parameters and checkpoints unchanged and contain no
 optimizer state; resume training from an original checkpoint. A partial PLY
-is renamed only after export finishes. Keep the snapshot beneath its run
-directory so Spirula can find the run's color configuration.
+is renamed only after export finishes. Keep the matching `.transform.json`
+beside the PLY so Spirula's model viewer can recover its primitive and color
+configuration even when the snapshot is moved away from the training output.
 
 ## Iterations, image count and splat capacity
 

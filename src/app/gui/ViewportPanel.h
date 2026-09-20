@@ -223,7 +223,7 @@ private:
     spirula::SceneTransform snapshot_transform() const;
     bool _training_transform = false;
     float _rotation_degrees[3] = {};
-    SnapshotCoordinates _coordinates = SnapshotCoordinates::ZUp;
+    SnapshotCoordinates _coordinates = snapshot_default_coordinates();
     float _snapshot_translation_scale = 1.0f;
     double _normalized_from_training[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     std::function<void(const SnapshotExport&)> _snapshot_exporter;
