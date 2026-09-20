@@ -22,6 +22,7 @@ struct NavCamera {
     float pos[3] = {0, 0, 1};
     float rot[4] = {0, 0, 0, 1};   // (x,y,z,w), camera-to-world rotation
     float target[3] = {0, 0, 0};   // orbit / turntable pivot
+    int up_axis = 2;
     Mode mode = Turntable;
     float speed_exp = 0.0f;        // Move Speed slider; speed = 10^exp
 

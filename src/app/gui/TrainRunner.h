@@ -16,6 +16,7 @@
 #include "app/TrainerCore.h"
 #include "app/webviewer/Viewer.h"
 #include "data/SceneTransform.h"
+#include "app/gui/Snapshot.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -83,7 +84,7 @@ public:
     void note_engine_taken();
     std::string error();
 
-    void export_snapshot(const spirula::SceneTransform& transform);
+    void export_snapshot(const SnapshotExport& snapshot);
     bool snapshot_busy() const { return _snapshot_busy.load(); }
     std::string snapshot_message();
 

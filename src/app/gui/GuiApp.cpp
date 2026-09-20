@@ -6014,9 +6014,9 @@ void GuiApp::draw_train() {
     const bool stepping = _runner.phase() == TrainRunner::Phase::Training;
     // The step both previews pace their refresh by while nobody is steering.
     const int step = stepping ? _runner.latest_progress().step : -1;
-    std::function<void(const spirula::SceneTransform&)> snapshot;
+    std::function<void(const SnapshotExport&)> snapshot;
     if (_runner.engine_ready())
-        snapshot = [this](const spirula::SceneTransform& transform) { _runner.export_snapshot(transform); };
+        snapshot = [this](const SnapshotExport& value) { _runner.export_snapshot(value); };
     _viewport.set_snapshot_exporter(std::move(snapshot), _runner.snapshot_busy(), _runner.snapshot_message());
     if (_preview_images) _images.draw(stepping, step);
     else                 _viewport.draw(stepping, step);

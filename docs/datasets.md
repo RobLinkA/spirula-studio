@@ -602,7 +602,9 @@ gives each group its old weight, so review the new rows before starting.
 
 The training viewport's center selector and X/Y/Z degree fields define a new
 coordinate frame. Rotation applies around fixed X, then Y, then Z axes, after
-the camera-leveling setting. The selected dataset camera or sparse-point
+the camera-leveling setting. The coordinate selector keeps Spirula's Z-up
+frame, converts to Y-up, or prepares a SuperSplat PLY with its import rotation
+compensated. The selected dataset camera or sparse-point
 center becomes the origin; it is not recomputed from evolving splat bounds.
 Navigation and Reset view do not change the export transform.
 
@@ -610,7 +612,7 @@ Navigation and Reset view do not change the export transform.
 or after completion. It takes the engine lock at a step boundary and writes
 `snapshot-<completed-step>-<timestamp>-<counter>/splat.ply` beneath the run
 directory, alongside a `transform.json` recording the training-to-snapshot
-rotation and translation. Preview and export use the same orientation and
+rotation, translation, and selected coordinate system. Preview and export use the same orientation and
 center; export preserves training-frame size. Gaussian orientations and
 directional SH colors rotate with positions.
 

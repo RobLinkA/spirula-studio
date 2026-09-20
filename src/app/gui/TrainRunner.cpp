@@ -103,7 +103,7 @@ std::string TrainRunner::snapshot_message() {
     return _snapshot_message;
 }
 
-void TrainRunner::export_snapshot(const spirula::SceneTransform& transform) {
+void TrainRunner::export_snapshot(const SnapshotExport& snapshot) {
     if (!_session || !engine_ready() || snapshot_busy()) return;
     if (_snapshot_worker.joinable()) _snapshot_worker.join();
     {
@@ -114,7 +114,7 @@ void TrainRunner::export_snapshot(const spirula::SceneTransform& transform) {
     _snapshot_busy = true;
     session->snapshot_pending = true;
     try {
-        _snapshot_worker = std::thread([this, session, transform] {
+        _snapshot_worker = std::thread([this, session, snapshot] {
             struct Finish {
                 std::atomic<bool>& pending;
                 std::atomic<bool>& busy;
@@ -136,14 +136,15 @@ void TrainRunner::export_snapshot(const spirula::SceneTransform& transform) {
                     if (fs::create_directory(folder)) break;
                 }
                 partial = folder / "splat.partial.ply";
-                engine_export_ply(partial.u8string(), &transform);
+                engine_export_ply(partial.u8string(), &snapshot.transform);
                 JsonWriter metadata;
                 metadata.object().field("format", "spirula-snapshot-transform").field("version", 1)
-                    .field("step", step).field("convention", "p_snapshot = R * p_training + t; original scene units")
+                    .field("step", step).field("coordinates", snapshot_coordinates_name(snapshot.coordinates))
+                    .field("convention", "p_snapshot = R * p_training + t; original scene units")
                     .key("rotation_row_major").array();
-                for (double v : transform.R) metadata.value(v);
+                for (double v : snapshot.transform.R) metadata.value(v);
                 metadata.end().key("translation").array();
-                for (double v : transform.t) metadata.value(v);
+                for (double v : snapshot.transform.t) metadata.value(v);
                 metadata.end().end();
                 std::ofstream info(folder / "transform.json", std::ios::binary);
                 info.exceptions(std::ios::failbit | std::ios::badbit);

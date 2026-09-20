@@ -124,8 +124,6 @@ void mat3_to_quat(const float m[9], float o[4]) {
     }
 }
 
-const float kWorldUp[3] = {0, 0, 1};
-
 }  // namespace
 
 
@@ -157,7 +155,7 @@ void NavCamera::orbit(float dx, float dy) {
     float right[3], up[3];
     axis_right(right);
     if (mode == Trackball) axis_up(up);
-    else { up[0] = kWorldUp[0]; up[1] = kWorldUp[1]; up[2] = kWorldUp[2]; }
+    else { up[0] = up[1] = up[2] = 0; up[up_axis] = 1; }
     float qa[4], qb[4], qab[4];
     q_from_axis_angle(up, -dx * sensitivity, qa);
     q_from_axis_angle(right, -dy * sensitivity, qb);
@@ -244,7 +242,7 @@ bool NavCamera::keyboard_tick(float dt, const Keys& k) {
     axis_forward(fwd);
     axis_right(right);
     if (mode == Turntable || mode == Fps) {
-        up[0] = kWorldUp[0]; up[1] = kWorldUp[1]; up[2] = kWorldUp[2];
+        up[0] = up[1] = up[2] = 0; up[up_axis] = 1;
     } else {
         axis_up(up);
     }
@@ -296,8 +294,10 @@ bool NavCamera::gamepad_tick(float dt) {
             v_scale(right, lx * s, move);
             v_scale(fwd, -ly * s, step);
             v_add(move, step, move);
+            float world_up[3] = {0, 0, 0};
+            world_up[up_axis] = 1.0f;
             float up_step[3];
-            v_scale(kWorldUp, (rt - lt) * s, up_step);
+            v_scale(world_up, (rt - lt) * s, up_step);
             v_add(move, up_step, move);
             v_add(pos, move, pos);
             v_add(target, move, target);

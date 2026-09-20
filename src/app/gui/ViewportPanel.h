@@ -20,6 +20,7 @@
 #include "data/SceneTransform.h"
 #include "app/gui/NavCamera.h"
 #include "app/gui/PreviewRenderer.h"
+#include "app/gui/Snapshot.h"
 
 #include <cstdint>
 #include <functional>
@@ -99,7 +100,7 @@ public:
     // (row-major 3x4 similarity, scale*R | t; identity by default). Applied to
     // the CAMERA, not the geometry, so moving a model costs nothing.
     void set_model_transform(const float a[12]);
-    void set_snapshot_exporter(std::function<void(const spirula::SceneTransform&)> exporter,
+    void set_snapshot_exporter(std::function<void(const SnapshotExport&)> exporter,
                                bool busy, const std::string& status);
 
     // What the dataset says about its own frame, so the panel can offer to
@@ -217,13 +218,16 @@ private:
     float _m2s_scale = 1.0f;
     bool _m2s_identity = true;
     void rebuild_m2s();
+    void set_coordinates(SnapshotCoordinates coordinates);
+    void coordinate_basis(float out[9]) const;
     void attach_training_transform(const spirula::TrainerSession& session, bool first);
     spirula::SceneTransform snapshot_transform() const;
     bool _training_transform = false;
     float _rotation_degrees[3] = {};
+    SnapshotCoordinates _coordinates = SnapshotCoordinates::ZUp;
     float _snapshot_translation_scale = 1.0f;
     double _normalized_from_training[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    std::function<void(const spirula::SceneTransform&)> _snapshot_exporter;
+    std::function<void(const SnapshotExport&)> _snapshot_exporter;
     bool _snapshot_busy = false;
     std::string _snapshot_status;
 

@@ -75,6 +75,26 @@ void ViewportPanel::reset_pose(float radius) {
     _dirty = true;
 }
 
+void ViewportPanel::coordinate_basis(float out[9]) const {
+    if (_coordinates == SnapshotCoordinates::ZUp) {
+        std::fill(out, out + 9, 0.0f);
+        out[0] = out[4] = out[8] = 1.0f;
+        return;
+    }
+    // Z-up training coordinates -> Y-up viewer coordinates: old +Z becomes +Y.
+    const float y_up[9] = {1,0,0, 0,0,1, 0,-1,0};
+    std::copy(y_up, y_up + 9, out);
+}
+
+void ViewportPanel::set_coordinates(SnapshotCoordinates coordinates) {
+    if (_coordinates == coordinates) return;
+    _coordinates = coordinates;
+    _cam.up_axis = coordinates == SnapshotCoordinates::ZUp ? 2 : 1;
+    _home.up_axis = _cam.up_axis;
+    rebuild_m2s();
+    _dirty = true;
+}
+
 void ViewportPanel::set_centers(const dsparse::CenterTable* centers, bool has_cameras) {
     _centers_known = centers != nullptr;
     _center_has_cameras = has_cameras;
@@ -212,6 +232,23 @@ void ViewportPanel::rebuild_m2s() {
         }
         _m2s[r*4+3] = o[r*4+3];
     }
+    float basis[9];
+    if (_training_transform) coordinate_basis(basis);
+    else {
+        std::fill(basis, basis + 9, 0.0f);
+        basis[0] = basis[4] = basis[8] = 1.0f;
+    }
+    float before_basis[12];
+    std::copy(_m2s, _m2s + 12, before_basis);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) {
+            float v = 0.0f;
+            for (int k = 0; k < 3; ++k) v += basis[r*3+k] * before_basis[k*4+c];
+            _m2s[r*4+c] = v;
+        }
+        _m2s[r*4+3] = basis[r*3+0] * before_basis[3] +
+                      basis[r*3+1] * before_basis[7] + basis[r*3+2] * before_basis[11];
+    }
     if (_training_transform) {
         const double radians = 3.14159265358979323846 / 180.0;
         const double angles[3] = {std::remainder((double)_rotation_degrees[2], 360.0)*radians,
@@ -240,6 +277,7 @@ void ViewportPanel::rebuild_m2s() {
 void ViewportPanel::attach_training_transform(const spirula::TrainerSession& session, bool first) {
     const auto& ds = session.ds;
     _training_transform = true;
+    _cam.up_axis = _coordinates == SnapshotCoordinates::ZUp ? 2 : 1;
     _snapshot_translation_scale = session.cfg.relative_scale.value_or(1.0f);
     if (first) std::fill(_rotation_degrees, _rotation_degrees + 3, 0.0f);
     const auto centers = dsparse::scene_centers(ds);
@@ -269,11 +307,20 @@ spirula::SceneTransform ViewportPanel::snapshot_transform() const {
         for (int c = 0; c < 3; ++c) transform.R[r*3+c] = A[r*4+c] / scale;
         transform.t[r] = A[r*4+3] / scale * _snapshot_translation_scale;
     }
+    if (_coordinates == SnapshotCoordinates::SuperSplat) {
+        // SuperSplat applies Transform.PLY (180 degrees around Z) on import.
+        for (int c = 0; c < 3; ++c) {
+            transform.R[c] = -transform.R[c];
+            transform.R[3 + c] = -transform.R[3 + c];
+        }
+        transform.t[0] = -transform.t[0];
+        transform.t[1] = -transform.t[1];
+    }
     return transform;
 }
 
 void ViewportPanel::set_snapshot_exporter(
-    std::function<void(const spirula::SceneTransform&)> exporter,
+    std::function<void(const SnapshotExport&)> exporter,
     bool busy, const std::string& status) {
     _snapshot_exporter = std::move(exporter);
     _snapshot_busy = busy;
@@ -811,6 +858,26 @@ void ViewportPanel::draw_controls(bool engine) {
         ui::help_on_hover(_training_transform ? msg::snapshot_center_help : msg::viewport_center_help);
     }
     if (_training_transform) {
+        place(px(150.0f) + st.ItemInnerSpacing.x + text_w(msg::snapshot_coordinates.get()));
+        ImGui::SetNextItemWidth(px(150.0f));
+        const auto coordinate_label = [&](SnapshotCoordinates c) -> const char* {
+            switch (c) {
+                case SnapshotCoordinates::YUp: return msg::snapshot_y_up.get();
+                case SnapshotCoordinates::SuperSplat: return msg::snapshot_supersplat.get();
+                default: return msg::snapshot_z_up.get();
+            }
+        };
+        if (ui::BeginComboRaw(ui::detail::label(msg::snapshot_coordinates),
+                              coordinate_label(_coordinates))) {
+            const SnapshotCoordinates choices[] = {SnapshotCoordinates::ZUp,
+                                                   SnapshotCoordinates::YUp,
+                                                   SnapshotCoordinates::SuperSplat};
+            for (SnapshotCoordinates choice : choices)
+                if (ui::SelectableRaw(coordinate_label(choice), choice == _coordinates))
+                    set_coordinates(choice);
+            ImGui::EndCombo();
+        }
+        ui::help_on_hover(msg::snapshot_coordinates_help);
         place(text_w(msg::snapshot_rotation.get()));
         ui::Text(msg::snapshot_rotation);
         const char* axes[] = {"X", "Y", "Z"};
@@ -827,7 +894,7 @@ void ViewportPanel::draw_controls(bool engine) {
         const auto& button = _snapshot_busy ? msg::snapshot_exporting : msg::snapshot_export;
         place(button_w(button));
         ImGui::BeginDisabled(!_snapshot_exporter || _snapshot_busy);
-        if (ui::Button(button)) _snapshot_exporter(snapshot_transform());
+        if (ui::Button(button)) _snapshot_exporter(SnapshotExport{snapshot_transform(), _coordinates});
         ImGui::EndDisabled();
         ui::help_on_hover(msg::snapshot_export_help);
     }
