@@ -15,6 +15,7 @@
 
 #include "app/AppPaths.h"
 #include "app/gui/Subprocess.h"
+#include "core/ModelMirror.h"
 #ifdef SS_TOOL_SFM
 // The stage tags the child prints and the manifest it reads; a build without the
 // module has no child to run (see availability()).
@@ -153,7 +154,7 @@ std::vector<PendingDownload> sfm_feature_downloads(int features, int matcher) {
 #if defined(SS_TOOL_SFM) && defined(SS_HAVE_ALIKED) && SS_HAVE_ALIKED
     auto take = [&](const nn::FetchFile& f) {
         const std::string dest = nn::cached_path(f);
-        if (!file_is_cached(dest, f.bytes)) out.push_back({f.url, dest, f.bytes});
+        if (!file_is_cached(dest, f.bytes)) out.push_back({f.url, dest, f.bytes, spirula::model_mirror_url(f.file)});
     };
     auto want_aliked = [&](const char* id) {
         if (const aliked::ModelSource* src = aliked::find_model_source(id)) take(src->onnx);
@@ -250,6 +251,7 @@ void SfmRunner::take_reconstruction(SfmJob& job) {
     job.overlap = _live.overlap;
     job.loop_closure = _live.loop_closure;
     job.prefilter_sequential = _live.prefilter_sequential;
+    job.use_sequence = _live.use_sequence;
     job.init_focal_px = _live.init_focal_px;
     job.init_distortion = _live.init_distortion;
     job.distortion_refine = _live.distortion_refine;
@@ -273,6 +275,7 @@ void SfmRunner::take_reconstruction(SfmJob& job) {
         job.prep.inputs[i].camera_model = _live.prep.inputs[i].camera_model;
         job.prep.inputs[i].focal_factor = _live.prep.inputs[i].focal_factor;
         job.prep.inputs[i].subcameras = _live.prep.inputs[i].subcameras;
+        job.prep.inputs[i].sequential = _live.prep.inputs[i].sequential;
     }
 }
 
@@ -488,17 +491,46 @@ sfm::Manifest SfmRunner::build_manifest(const SfmJob& job, const PrepResult& pre
         man.captures.push_back(std::move(c));
     }
     man.rigs = build_rigs(job.prep, &prep);
+    man.sequences = build_sequences(job);
     return man;
+}
+
+// One sequence per video (its lens folders, or its frames as they are) and
+// per folder marked as shot in order (its camera folders, or itself).
+std::vector<sfm::SequenceDef> SfmRunner::build_sequences(const SfmJob& job) {
+    std::vector<sfm::SequenceDef> out;
+    if (!job.use_sequence) return out;
+    auto join = [](const std::string& a, const std::string& b) {
+        return a.empty() ? b : b.empty() ? a : a + "/" + b;
+    };
+    for (const PrepInput& in : job.prep.inputs) {
+        if (!in.is_video && !in.sequential) continue;
+        sfm::SequenceDef d;
+        if (!in.subcameras.empty()) {
+            for (const SubCamera& sc : in.subcameras) d.members.push_back(join(in.subdir, sc.rel));
+        } else {
+            for (const std::string& lens : lens_dirs(job.prep, in))
+                d.members.push_back(join(in.subdir, lens));
+            if (d.members.empty()) d.members.push_back(in.subdir);
+        }
+        out.push_back(std::move(d));
+    }
+    return out;
 }
 
 namespace {
 
 // What input `in`'s file says about the lenses `d` lists (lens_dirs order), if
-// its frames were kept at one instant: a 360 packing's views sit at rotations
-// the extraction chose; a dual-fisheye file's two tracks are back to back.
+// its frames were kept at one instant (lenses sharing a frame always are): a
+// 360 packing's views sit where extraction chose; a dual fisheye's back to back.
 bool apply_known_lenses(const PrepJob& prep, const PrepResult* res, const PrepInput& in,
                         sfm::RigDef& d) {
-    if (!in.is_video || !in.subcameras.empty() || !res) return false;
+    if (!in.subcameras.empty()) return false;
+    if (in.packed_lenses == 2 && d.members.size() == 2) {
+        d.kind = "dual-fisheye";
+        return sfm::applyRigKind(d).empty();
+    }
+    if (!in.is_video || !res) return false;
     bool lockstep = false;
     for (const PrepCapture& c : res->captures)
         if (c.path == in.path && c.subdir == in.subdir) lockstep = c.lockstep;
@@ -599,7 +631,7 @@ std::vector<sfm::RigDef> SfmRunner::build_rigs(const PrepJob& prep, const PrepRe
         }
         if (parts.empty()) continue;
         sfm::RigDef d;
-        d.name = std::string(1, (char)('A' + letter));
+        d.name = rig_letter(letter);
         bool same = parts.size() > 1 && parts[0].second.size() > 1;
         for (const auto& p : parts) same = same && p.second == parts[0].second;
         if (same) {
@@ -628,7 +660,7 @@ std::vector<sfm::RigDef> SfmRunner::build_rigs(const PrepJob& prep, const PrepRe
             const PrepInput& b = prep.inputs[parts[k].first];
             known = a.pano360.valid() == b.pano360.valid() &&
                     a.pano360.packing == b.pano360.packing &&
-                    is_dual_fisheye_path(a.path) == is_dual_fisheye_path(b.path);
+                    is_dual_lens(a) == is_dual_lens(b);
             sfm::RigDef probe;
             probe.members = d.members;
             known = known && apply_known_lenses(prep, res, b, probe);

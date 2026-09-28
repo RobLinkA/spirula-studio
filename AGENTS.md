@@ -47,6 +47,10 @@ assets/fonts/               the five embedded UI faces + the full-CJK face
                               table (assets/fonts/README.md). The CJK subsets
                               are GENERATED from the catalogs -- see below
 tools/codegen/              the four codegen tools (see "Codegen" below)
+tools/guictl.py             drive the GUI from a script -- list the widgets on
+                              screen, click them, read the framebuffer back.
+                              tools/gui_mcp.py is the same surface as an MCP
+                              server; docs/notes/gui-automation.md
 reference/scripts/          dataset preprocessing CLI tools (Python, standalone;
                               mask.py is embedded into the GUI binary)
 reference/python/           hand-run tools on NO code path: eval_lpips.py,
@@ -104,9 +108,11 @@ src/
 ├── moge/                   MoGe-2 point maps + normals + a sky mask, on top of
 │                             nn/. The DEFAULT geometry model
 │                             -- READ src/moge/README.md
-├── video/                  container demux + VK_KHR_video_decode_*, on top of
-│                             nn/. PATENT-GATED: compiled only with
-│                             SS_ENABLE_PATENTED=ON -- READ src/video/README.md
+├── video/                  container demux + VK_KHR_video_decode_*, and the
+│                             VK_KHR_video_encode_* encoder behind `spirula
+│                             encode`, on top of nn/. PATENT-GATED: compiled
+│                             only with SS_ENABLE_PATENTED=ON -- READ
+│                             src/video/README.md
 ├── backend/                the backend seam — READ backend/README.md
 │   ├── api/                backend-neutral launch declarations (GENERATED forwarders)
 │   ├── cuda/  common/      CUDA runtime shim, SortScan (declaration in
@@ -134,6 +140,18 @@ src/
 │   ├── CrashLog.{h,cpp}    the stack trace every tool leaves in <config>/crash.log
 │   │                         when it faults -- armed for all of them in Main.cpp
 │   ├── gui/                Dear ImGui desktop app (`spirula` with no arguments)
+│   │   └── edit/             selecting parts of a model (by region, by
+│   │                           attribute, by colour), deleting them, and
+│   │                           placing the whole model: one document /
+│   │                           selection / tool seam over splats, sparse
+│   │                           points and meshes
+│   │                           -- docs/notes/gui-editing-plan.md,
+│   │                              docs/notes/scene-transform.md
+│   │   └── render/           photos and videos of a model: keyframed
+│   │                           camera moves, lenses, transitions, and the
+│   │                           frames written as images, a GIF, or piped
+│   │                           into an encoder
+│   │                           -- docs/notes/render-video.md
 │   ├── webviewer/          HTTP server + render worker + viewer.html (the ONE
 │   │                         browser client, embedded into the engine library
 │   │                         so the CLI and the GUI serve the same bytes)
@@ -196,7 +214,8 @@ Full matrix and per-platform notes: `docs/build.md`.
 
 **`SS_ENABLE_PATENTED` is OFF by default and should stay that way in
 anything you commit.** It gates `src/video/` -- the H.264 / H.265 / AV1
-bitstream parsers and the VK_KHR_video_decode_* driver -- which is the only
+bitstream parsers, the VK_KHR_video_decode_* driver and the
+VK_KHR_video_encode_* encoder behind `spirula encode` -- which is the only
 patent-encumbered code in the tree. With it off, everything that wanted it
 shells out to ffmpeg instead; no feature disappears, a subprocess appears. See
 the comment on the option in `cmake/SsOptions.cmake` before changing it.
@@ -577,7 +596,8 @@ no ceremony — do not ask, do not leave a note saying you removed it.
 - **The camera models exist twice, on purpose, and only twice.** The device
   copy is `shaders/projection_utils.slang`; the host copy is
   `data/CameraMath.h`, which the GUI's frustum wireframe and `spirula
-  geometry`'s resampling both call. A third copy is a bug waiting to be found
+  geometry`'s resampling both call. The wireframe's shape is the web viewer's,
+  in one host copy too: `data/FrustumTemplate.h`. A third copy is a bug waiting to be found
   by nobody -- `spirula geometry --check` is what tests the host one, by
   round-tripping an analytic plane through every camera model.
 - **"Is this lens too wide for one pinhole?" is asked in three places and must
@@ -623,6 +643,23 @@ no ceremony — do not ask, do not leave a note saying you removed it.
   vertex color) is written BEFORE the bake, not after. `generate_mesh()` is
   ordered that way on purpose; moving a write past the atlas ships a file whose
   colors no longer match its vertices.
+- **Rotating a splat model means rotating its SH, and the sign convention is
+  where that goes wrong.** `core/ShRotation.h` is the closed form
+  (Ivanic-Ruedenberg), conjugated for the Condon-Shortley phase
+  `shaders/harmonics.slang` carries; without the conjugation bands 1 and 3 are
+  wrong by signs a casual render does not show. `sh_rotation_test` holds it to
+  a sampled fit of that basis and `splat_transform_render` to the engine
+  itself. Touch the basis and both have to follow. docs/notes/sh-rotation.md.
+- **An edited model's placement is applied by the VIEWER until it is saved**
+  (`EditDoc::placement`), so there are two frames on screen: the elements'
+  own, and the saved coordinates the grid, the pivot and the alignment helpers
+  live in. docs/notes/scene-transform.md has the algebra; get a composition
+  order wrong and the model moves the right amount about the wrong point.
+- **The viewport's orthographic view is a pinhole 256x further off with a lens
+  256x longer** (`ViewportPanel`, `kOrthoPull`), because then every renderer,
+  primitive and selection test works unchanged. Anything that takes a
+  RELATIVE depth tolerance has to subtract the pull-back first
+  (`ViewProjection::ortho_back`).
 - **A GUI worker that clears a `busy` flag at the end of its function will
   strand it.** Every early `return set_error(...)` skips the line, and the next
   request is refused forever. Use a scope guard (`SegmentPanel::start_job`).

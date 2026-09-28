@@ -69,7 +69,7 @@ add_compile_definitions(SS_SOURCE_ROOT="${SS_ROOT}")
 
 # The version the apps report with --version. Declared here and nowhere else;
 # it used to be read out of pyproject.toml, back when there was a package.
-set(SS_VERSION "2026.9.20")
+set(SS_VERSION "2026.9.24")
 
 # The commit goes in it too, so a crash report names an exact tree without
 # anyone having to bump a string by hand. Read at configure time, which is
@@ -250,23 +250,12 @@ if(NOT SS_FONT_CJK MATCHES "^(fetch|none|sc|tc|jp|kr|all)$")
 endif()
 
 # ---------------------------------------------------------------------------
-# Patent-encumbered modules
-#
-# OFF by default, and deliberately so: this repository is GPLv3, and the video
-# codecs are the one piece of it that carries third-party patent exposure
-# (H.264 / H.265 via MPEG LA / Access Advance, AV1 via the claims asserted
-# against AOMedia). With it OFF, src/video/ -- the container demuxers, the
-# H.264 / H.265 / AV1 bitstream parsers and the VK_KHR_video_decode_* driver --
-# is neither compiled nor linked, and everything that wanted it shells out to
-# an external ffmpeg instead. That costs a subprocess and a temporary folder of
-# JPEGs; no feature disappears from the GUI.
-#
-# Turn it ON to decode video in-process on the GPU (roughly 15x faster frame
-# extraction, and no ffmpeg to install). Distributors should check what their
-# jurisdiction and their users require before shipping a binary built with it.
+# Patent-encumbered modules: src/video/ (H.264 / H.265 / AV1 decode and encode),
+# the one part of this GPLv3 tree with third-party patent exposure. OFF by
+# default, deliberately; off, ffmpeg does the work. docs/build.md explains.
 # ---------------------------------------------------------------------------
 option(SS_ENABLE_PATENTED
-    "Compile patent-encumbered modules (in-process H.264/H.265/AV1 video decode)"
+    "Compile patent-encumbered modules (in-process H.264/H.265/AV1 video decode and encode)"
     OFF)
 if(SS_ENABLE_PATENTED AND NOT SS_BUILD_SAM)
     message(FATAL_ERROR

@@ -52,6 +52,7 @@ static void test_dataset_preset() {
     s.use_found_masks = false;
     s.border_enable = true;
     s.mask_model_id = "sam2.1_hiera_large";
+    s.frame_shapes = "selfie stick";
 
     s.sfm.prep.resume = false;
     s.sfm.prep.photo_import = gui::PhotoImport::Move;
@@ -109,6 +110,7 @@ static void test_dataset_preset() {
     s.sfm.pairs = 3;
     s.sfm.overlap = 25;
     s.sfm.loop_closure = false;
+    s.sfm.use_sequence = false;
     s.sfm.init_focal_px = 1500.0f;
     s.sfm.init_distortion = "0.1,0.02";
     s.sfm.distortion_refine = 2;
@@ -165,6 +167,7 @@ static void test_dataset_preset() {
     CHECK_EQ(b.use_found_masks, s.use_found_masks);
     CHECK_EQ(b.border_enable, s.border_enable);
     CHECK_EQ(b.mask_model_id, s.mask_model_id);
+    CHECK_EQ(b.frame_shapes, s.frame_shapes);
 
     CHECK_EQ(b.sfm.prep.resume, s.sfm.prep.resume);
     CHECK(b.sfm.prep.photo_import == s.sfm.prep.photo_import);
@@ -222,6 +225,7 @@ static void test_dataset_preset() {
     CHECK_EQ(b.sfm.pairs, s.sfm.pairs);
     CHECK_EQ(b.sfm.overlap, s.sfm.overlap);
     CHECK_EQ(b.sfm.loop_closure, s.sfm.loop_closure);
+    CHECK_EQ(b.sfm.use_sequence, s.sfm.use_sequence);
     CHECK_EQ(b.sfm.init_focal_px, s.sfm.init_focal_px);
     CHECK_EQ(b.sfm.init_distortion, s.sfm.init_distortion);
     CHECK_EQ(b.sfm.distortion_refine, s.sfm.distortion_refine);

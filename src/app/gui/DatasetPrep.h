@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
@@ -83,7 +84,21 @@ struct SubCamera {
 
 // A row's rig choice: nothing, the lenses of its own input, or one of the
 // shared letters that join rows across inputs (SfmRunner::build_rigs).
-inline constexpr int kRigNone = 0, kRigOwn = 1, kRigFirstShared = 2, kRigShared = 4;
+inline constexpr int kRigNone = 0, kRigOwn = 1, kRigFirstShared = 2;
+// How many letters the rig picker may offer; it shows one per two rows.
+inline constexpr int kRigShared = 32;
+
+// A, B, ... Z, AA, AB, ...
+inline std::string rig_letter(int letter) {
+    std::string s;
+    for (int n = letter + 1; n > 0; n = (n - 1) / 26)
+        s.insert(s.begin(), (char)('A' + (n - 1) % 26));
+    return s;
+}
+
+// PrepInput::fps for "every frame" -- a 0 there already means "^". Everywhere
+// else, a rate of 0 is every frame.
+inline constexpr float kFpsEveryFrame = -1.0f;
 
 // One thing the user picked: a video file, or a folder of photos. A job holds
 // a list of them, because a capture is often shot as several clips, or on a rig
@@ -122,6 +137,10 @@ struct PrepInput {
     // as several clips is rarely shot at one pace, and a clip walked through
     // slowly wants fewer frames than the one that ran past the same wall.
     float fps = 0.0f;
+    // The photos were taken one after another and named in that order, so the
+    // reconstruction may trust neighbouring files first (a video's frames
+    // always are; SfmRunner::build_sequences).
+    bool sequential = false;
     int video_tracks = 0;            // 0 = not probed yet
     // The camera folders found under this input, when it arrived with more
     // than one. Empty means the lens above describes all of it.
@@ -133,6 +152,10 @@ struct PrepInput {
     // Set instead when the file says it IS a 360 packing this build cannot
     // place, for the line that says its tracks are being left as they are.
     bool pano360_unsupported = false;
+    // Fisheye circles side by side in each frame of a .lrv, or each .insp of
+    // a folder (app::packed_lens_count); two are cut apart into cam0/, cam1/.
+    // 0 = not such an input, or not measured yet.
+    int packed_lenses = 0;
     // Areas of the frame that are never scene -- the fisheye border, a
     // watermark, the rig in shot. Per input because it describes a lens, and
     // resolved per camera folder when it asks for the border to be fitted
@@ -233,7 +256,8 @@ struct PrepJob {
     // panoramas and pinhole faces in one image tree describes no camera rig.
     app::Pano360Options pano;
 
-    // Kept frames per second; PrepInput::fps overrides it per video.
+    // Kept frames per second, 0 = every frame; PrepInput::fps overrides it
+    // per video.
     float video_fps = 2.0f;
     // Space them by view change rather than by time (app/FrameMotion.h): the
     // rate above becomes the average and stays within `adaptive_range` of it.
@@ -294,15 +318,16 @@ struct PrepJob {
     std::string python_exe = "python3";
 };
 
-// The rate a row is actually extracted at. 0 means "the same as the row above",
-// which is how the lens column already spells a decision made once for a run of
-// clips; the first row falls back to the dataset's own rate.
+// The rate a row is actually extracted at (0 = every frame). A row's 0 means
+// "the same as the row above", as the lens column spells a decision made once
+// for a run of clips; the first row falls back to the dataset's own rate.
 inline float input_fps(const std::vector<PrepInput>& inputs, float dataset_fps,
                        size_t at) {
     for (size_t k = std::min(at, inputs.size() - (inputs.empty() ? 0 : 1)) + 1;
          k-- > 0;)
-        if (k < inputs.size() && inputs[k].fps > 0.0f) return inputs[k].fps;
-    return dataset_fps;
+        if (k < inputs.size() && inputs[k].fps != 0.0f)
+            return std::max(inputs[k].fps, 0.0f);
+    return std::max(dataset_fps, 0.0f);
 }
 
 // Rows extracted at one rate, named by the one that states it -- so an adaptive
@@ -311,7 +336,7 @@ inline float input_fps(const std::vector<PrepInput>& inputs, float dataset_fps,
 inline size_t fps_group(const std::vector<PrepInput>& inputs, size_t at) {
     size_t g = 0;
     for (size_t k = 1; k <= at && k < inputs.size(); k++)
-        if (inputs[k].fps > 0.0f) g = k;
+        if (inputs[k].fps != 0.0f) g = k;
     return g;
 }
 
@@ -326,13 +351,30 @@ inline float input_fps(const PrepJob& job, const PrepInput& in) {
     return input_fps(job.inputs, job.video_fps, input_index(job, in));
 }
 
+// No selection happens at all: no sharpness window, no motion plan.
+inline bool every_frame(const PrepJob& job, const PrepInput& in) {
+    return in.is_video && !(input_fps(job, in) > 0.0f);
+}
+
+// Nothing left for adaptive spacing to decide, which the panel warns about.
+inline bool all_videos_every_frame(const std::vector<PrepInput>& inputs,
+                                   float dataset_fps) {
+    bool any = false;
+    for (size_t i = 0; i < inputs.size(); i++) {
+        if (!inputs[i].is_video) continue;
+        if (input_fps(inputs, dataset_fps, i) > 0.0f) return false;
+        any = true;
+    }
+    return any;
+}
+
 // Images read where they are instead of gathered into the dataset's own
 // images/ (see DatasetPrep::run). Several inputs reconstruct from ONE image
 // tree, so there is nowhere for a second one to be read in place from.
 inline bool reads_photos_in_place(const std::vector<PrepInput>& inputs,
                                   PhotoImport mode) {
     return mode == PhotoImport::InPlace && inputs.size() == 1 &&
-           !inputs[0].is_video;
+           !inputs[0].is_video && inputs[0].packed_lenses == 0;
 }
 
 // Where a job's images will be, before it has run: what PrepResult::image_dir
@@ -429,7 +471,7 @@ const Backends& backends();
 
 // Video container extensions the GUI offers, in the file dialog and for
 // drag-and-drop. Sized here so a range-for over it works from another TU.
-inline constexpr int kNumVideoExtensions = 13;
+inline constexpr int kNumVideoExtensions = 14;
 extern const char* const kVideoExtensions[kNumVideoExtensions];
 
 // Does this path name one of them? (Extension only; the file need not exist.)
@@ -440,6 +482,21 @@ bool is_dual_fisheye_path(const std::string& path);
 // A GoPro MAX .360 by its name. The packing itself is what probe_pano360
 // confirms; this only decides whether it is worth asking.
 bool is_pano360_path(const std::string& path);
+// An Insta360 .insp photo or .lrv proxy: one or two fisheye circles packed
+// into each frame, which PrepInput::packed_lenses counts.
+bool is_packed_lens_path(const std::string& path);
+
+// Two fisheye lenses back to back, as tracks or side by side.
+inline bool is_dual_lens(const PrepInput& in) {
+    return is_dual_fisheye_path(in.path) || in.packed_lenses >= 2;
+}
+// A lens the default camera model does not fit.
+inline bool has_fisheye_lens(const PrepInput& in) {
+    return is_dual_fisheye_path(in.path) || is_packed_lens_path(in.path) ||
+           in.packed_lenses > 0;
+}
+// The lenses of the first .insp under `dir`, or 0 when it holds none.
+int probe_packed_lenses(const std::string& dir);
 
 // ---- the ffmpeg fallback, for callers that are not a preparation run -------
 //
@@ -534,6 +591,9 @@ inline constexpr size_t kMaxCameraFolders = 64;
 // stops at the first hit, so it is cheap enough for the UI thread.
 bool folder_has_images(const std::string& dir);
 
+// The photo extensions an input folder is indexed for.
+bool is_image_file(const std::filesystem::path& p);
+
 // Is this folder an already-reconstructed dataset -- something the trainer's
 // dataparsers can read -- rather than raw input? True for a Nerfstudio
 // transforms.json, a COLMAP sparse/ or colmap/, or a Metashape camera .xml
@@ -555,6 +615,7 @@ struct WorkspaceState {
     bool frames = false;    // images/ this run would extract into
     bool features = false;  // features/, matches.bin, database.db -- reusable
     bool masks = false;     // masks/ this run would generate into
+    bool input_masks = false;  // masks an input came with (PrepInput::mask_dir)
     // A reconstruction any dataset reader can open: this run's own sparse/, or
     // the transforms.json, root-level COLMAP files or Metashape export of a
     // dataset that arrived finished. A run pointed at one ADDS to it.
@@ -580,6 +641,10 @@ std::vector<std::string> workspace_artifacts(const std::string& workspace,
 // own? By name, which is what makes it a convention: `--mask-dir masks` is the
 // SfM default and `mask_dir = "masks"` the dataparsers'.
 bool is_mask_folder(const std::string& path);
+
+// The correction editor's layer folder (app/gui/mask/MaskLayer.h), which a
+// finished dataset carries beside images/ and masks/ and which holds PNGs.
+bool is_mask_edits_folder(const std::string& path);
 
 // One counter for a whole step, rather than one per input: a job with three
 // videos in it should fill the bar once and never wind it back, which is the
@@ -660,6 +725,11 @@ private:
     bool extract_360_ffmpeg(const PrepJob& job, const PrepInput& in,
                             const std::string& images, PrepResult& out,
                             std::string& error);
+    // A packed video's frames, written whole into `images`, cut into one
+    // folder per lens. Each frame goes once its lenses are written, so a
+    // resumed run finishes an interrupted pass.
+    bool split_packed_frames(const PrepInput& in, const std::string& images,
+                             PrepResult& out, std::string& error);
     // Photos into the dataset's own images/<subdir>, by whichever of
     // PhotoImport the job asked for -- and the masks they came with into the
     // matching masks/<subdir>, so the two trees still mirror each other.

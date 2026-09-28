@@ -5,6 +5,7 @@
 // frame; ViewportPanel selects the navigation up axis. Its projection shader
 // matches the engine viewer's pinhole and fisheye models.
 
+#include "app/gui/render/TransitionFx.h"
 #include "data/DatasetParser.h"
 #include "mesh/MeshExport.h"   // meshing::MeshData
 
@@ -21,16 +22,47 @@ enum class PreviewProjection {
     Pinhole = 0, Fisheye, Equisolid, Equirectangular
 };
 
+// How a frame for a FILE is drawn, as opposed to one for the viewport
+// (app/gui/render/). Every default is what the viewport already does.
+struct PreviewStyle {
+    // Cleared to nothing rather than to the viewport's grey, so the frame
+    // composites: alpha is 1 where something was drawn.
+    bool transparent = false;
+    // The cloud: 0 square, 1 circle, 2 gaussian, 3 sphere of `point_radius`
+    // (normalized frame); the screen shapes are `point_px` across.
+    int point_shape = 0;
+    float point_px = 2.0f;
+    float point_radius = 0.0f;
+    // Lens distortion: CameraDistortionType and its coefficients.
+    int tier = 0;
+    float dist[8] = {};
+    // Nothing past the plane n.p = d (normalized frame) is drawn, and the
+    // `glow` before it lights up: the sweep reveal.
+    bool clip = false;
+    float plane[4] = {0, 0, 1, 0};
+    float glow = 0.0f;
+    float glow_col[3] = {1.0f, 0.86f, 0.6f};
+    // A 3D transition moving the cloud's points or the mesh's vertices
+    // (render/TransitionFx.h): its kind, side, time, settings and scene, the
+    // scene in the normalized frame.
+    int fx = 0;
+    bool fx_in = false;
+    float fx_t = 0.0f;
+    float fx_p[2] = {0.0f, 0.0f};
+    gui::render::FxGeo fx_geo;
+};
+
 class PreviewRenderer {
 public:
     // Build GL buffers from the parsed dataset. Requires a current GL
     // context (GUI thread) and the session's load_dataset() to have
     // completed. Returns false when GL init fails (missing functions).
     bool build(const spirula::TrainerSession& session);
-    // The same, from the parsed data alone. A point cloud opened in the
-    // viewer has no session behind it and no cameras at all (`post` empty,
-    // ds.num_cameras == 0), which this handles: it simply draws no frusta.
-    bool build(const ParsedDataset& ds, const PostSplitCameras& post);
+    // The same over parsed data alone, with no cameras at all handled (a
+    // point file has none, and then no frusta are drawn). `cam_selected` is
+    // one flag per camera of `ds`, drawn in the highlight colour.
+    bool build(const ParsedDataset& ds, const PostSplitCameras& post,
+               const uint8_t* cam_selected = nullptr);
     // A triangle mesh, drawn shaded instead of a point cloud. `to_normalized`
     // is the similarity that maps the mesh's own coordinates into the frame
     // the viewport navigates (scale + center, as SplatViewer computes for a
@@ -64,7 +96,11 @@ public:
                     PreviewProjection proj, float sx, float sy,
                     float scene_radius, float view_dist,
                     const float view_target[3], bool show_cams,
-                    float frustum_scale, bool show_grid);
+                    float frustum_scale, bool show_grid,
+                    // How far an orthographic view's camera was pulled back
+                    // along its axis (ViewportPanel::ortho_pullback), 0 if not.
+                    float ortho_back = 0.0f,
+                    const PreviewStyle* style = nullptr);
 
     // Base frustum size (camhost::frustum_display_size, normalized frame).
     float base_camera_size() const { return _base_cam_size; }
@@ -89,6 +125,15 @@ private:
     unsigned _prog = 0;
     int _u_view = -1, _u_scale = -1, _u_dscale = -1, _u_color = -1;
     int _u_model = -1, _u_s = -1, _u_zrange = -1, _u_vp = -1;
+    // Style uniforms, one set per program: [0] lines and points, [1] mesh.
+    struct StyleLoc {
+        int tier = -1, dist = -1, clip_on = -1, clip = -1, glow = -1, glow_col = -1;
+        int fx = -1, fx_in = -1, fx_t = -1, fx_p = -1, fx_c = -1, fx_up = -1, fx_e1 = -1,
+            fx_e2 = -1, fx_radius = -1, fx_qh = -1, fx_qa = -1, fx_qr = -1;
+    } _sloc[2];
+    void style_locations(int program, unsigned prog);
+    int _u_points = -1, _u_psize = -1, _u_pradius = -1;
+    void set_style_uniforms(int program, const PreviewStyle& st);
 
     // Mesh program: same projection GLSL, shaded triangles.
     unsigned _mprog = 0;
@@ -120,8 +165,11 @@ private:
     // Host copy of the displayed (stride-sampled, normalized-frame) points
     // for double-click picking. CPU RAM only.
     std::vector<float> _pick_xyz;
-    int64_t _num_cam_verts = 0;    // total frustum verts (bright then dim)
-    int64_t _num_cam_bright = 0;   // border + anchor verts (drawn full-color)
+    // Frustum verts, in draw order: the selected cameras' lines, then the
+    // rest's borders and anchors, then the rest's dimmed interior gridlines.
+    int64_t _num_cam_verts = 0;
+    int64_t _num_cam_sel = 0;
+    int64_t _num_cam_bright = 0;
     float _base_cam_size = 0.1f;
 
     unsigned _fbo = 0, _color_tex = 0, _depth_rb = 0;

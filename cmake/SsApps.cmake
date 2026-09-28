@@ -64,6 +64,7 @@ set(SS_TOOL_LIBS "")
 # including the ones the GUI spawns.
 list(APPEND SS_TOOL_SOURCES
      ${SS_SRC}/app/FrameMask.cpp
+     ${SS_SRC}/app/FrameMaskSvg.cpp
      ${SS_SRC}/app/FrameLook.cpp
      ${SS_SRC}/app/FrameMotion.cpp
      ${SS_SRC}/app/Pano360.cpp
@@ -113,6 +114,9 @@ if(SS_BUILD_SAM)
              ${SS_SRC}/app/cli/sam_extract.cpp
              ${SS_SRC}/app/FrameExtract.cpp)
         list(APPEND SS_TOOL_LIBS ss_video)
+        # ---- video encoding: what the GUI's render mode pipes frames into ----
+        list(APPEND SS_TOOL_SOURCES ${SS_SRC}/app/cli/encode_main.cpp)
+        list(APPEND SS_TOOL_DEFS SS_TOOL_ENCODE=1)
     endif()
 
     # ---- monocular depth and normals ----
@@ -170,6 +174,10 @@ if(SS_BUILD_GUI)
     )
     target_compile_options(imgui_glfw PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:${SPLAT_CXX_FLAGS}>)
+    # The item hooks src/app/gui/Automation.cpp implements: one never-taken
+    # branch per widget until it arms them. Not an option -- imgui references
+    # the hooks once this is on, so a build without Automation.cpp would fail.
+    target_compile_definitions(imgui_glfw PUBLIC IMGUI_ENABLE_TEST_ENGINE)
     target_include_directories(imgui_glfw PUBLIC
         ${imgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}/backends
@@ -213,7 +221,9 @@ if(SS_BUILD_GUI)
         ${CMAKE_BINARY_DIR}/app_generated/app_banner.h
         AppBanner)
 
-    file(GLOB SS_GUI_SOURCES CONFIGURE_DEPENDS ${SS_SRC}/app/gui/*.cpp)
+    file(GLOB SS_GUI_SOURCES CONFIGURE_DEPENDS
+        ${SS_SRC}/app/gui/*.cpp ${SS_SRC}/app/gui/edit/*.cpp
+        ${SS_SRC}/app/gui/render/*.cpp ${SS_SRC}/app/gui/mask/*.cpp)
     list(APPEND SS_TOOL_SOURCES ${SS_GUI_SOURCES})
     list(APPEND SS_TOOL_DEFS SS_TOOL_GUI=1)
     list(APPEND SS_TOOL_LIBS imgui_glfw OpenGL::GL)
@@ -313,6 +323,7 @@ if(SS_SEPARATE_TOOLS)
     endif()
     if(SS_BUILD_SAM)
         set(_sam_src ${SS_SRC}/app/cli/sam_main.cpp ${SS_SRC}/app/FrameMask.cpp
+                     ${SS_SRC}/app/FrameMaskSvg.cpp
                      ${SS_SRC}/app/FrameLook.cpp ${SS_SRC}/app/FrameMotion.cpp
                      ${SS_SRC}/app/Pano360.cpp)
         set(_sam_lib ss_sam)
@@ -346,6 +357,20 @@ add_executable(frame_motion_test
     ${SS_SRC}/app/Pano360.cpp)
 ss_configure_app(frame_motion_test)
 
+add_executable(packed_lens_test
+    ${SS_SRC}/app/tests/packed_lens_test.cpp
+    ${SS_SRC}/app/Pano360.cpp)
+ss_configure_app(packed_lens_test)
+
+# The stencil shapes, spelling and fill, with no GUI: FrameMask.cpp is compiled
+# into the CLI too, so this must link without imgui.
+add_executable(frame_mask_test
+    ${SS_SRC}/app/tests/frame_mask_test.cpp
+    ${SS_SRC}/app/FrameMask.cpp
+    ${SS_SRC}/app/FrameMaskSvg.cpp
+    ${SS_SRC}/app/FrameLook.cpp)
+ss_configure_app(frame_mask_test)
+
 # The GUI files with no GUI in them: the stamp that decides whether a finished
 # reconstruction is kept or built again, and the preset serializers. Named
 # rather than globbed -- each such test names its own sources.
@@ -365,6 +390,32 @@ if(SS_BUILD_GUI)
         ${SS_SRC}/app/gui/Subprocess.cpp)
     ss_configure_app(command_argv_test)
 
+    add_executable(align_fit_test
+        ${SS_SRC}/app/gui/tests/align_fit_test.cpp)
+    ss_configure_app(align_fit_test)
+
+    add_executable(attributes_test
+        ${SS_SRC}/app/gui/tests/attributes_test.cpp
+        ${SS_SRC}/app/gui/edit/Attributes.cpp
+        ${SS_SRC}/app/gui/edit/EditDoc.cpp
+        ${SS_SRC}/app/gui/edit/ElementGrid.cpp
+        ${SS_SRC}/app/gui/edit/Selection.cpp)
+    ss_configure_app(attributes_test)
+
+    add_executable(rig_guess_test
+        ${SS_SRC}/app/gui/tests/rig_guess_test.cpp
+        ${SS_SRC}/app/gui/RigGuess.cpp)
+    ss_configure_app(rig_guess_test)
+
+    add_executable(render_project_test
+        ${SS_SRC}/app/gui/tests/render_project_test.cpp
+        ${SS_SRC}/app/gui/render/FlightFit.cpp
+        ${SS_SRC}/app/gui/render/GifWriter.cpp
+        ${SS_SRC}/app/gui/render/LensPresets.cpp
+        ${SS_SRC}/app/gui/render/RenderProject.cpp
+        ${SS_SRC}/app/gui/render/Trajectory.cpp)
+    ss_configure_app(render_project_test)
+
     add_executable(preset_roundtrip_test
         ${SS_SRC}/app/gui/tests/preset_roundtrip_test.cpp
         ${SS_SRC}/app/gui/DatasetPreset.cpp
@@ -373,4 +424,53 @@ if(SS_BUILD_GUI)
         ${SS_SRC}/app/gui/PresetFile.cpp
         ${SS_SRC}/app/AppPaths.cpp)
     ss_configure_app(preset_roundtrip_test)
+
+    add_executable(stencil_edit_test
+        ${SS_SRC}/app/gui/tests/stencil_edit_test.cpp
+        ${SS_SRC}/app/gui/StencilEdit.cpp
+        ${SS_SRC}/app/gui/StencilPreset.cpp
+        ${SS_SRC}/app/gui/PresetFile.cpp
+        ${SS_SRC}/app/AppPaths.cpp
+        ${SS_SRC}/app/FrameMask.cpp
+        ${SS_SRC}/app/FrameMaskSvg.cpp
+        ${SS_SRC}/app/FrameLook.cpp)
+    ss_configure_app(stencil_edit_test)
+
+    # The mask editor's layer, document and session, none of which draw.
+    add_executable(mask_doc_test
+        ${SS_SRC}/app/gui/tests/mask_doc_test.cpp
+        ${SS_SRC}/app/gui/mask/MaskLayer.cpp
+        ${SS_SRC}/app/gui/mask/MaskDoc.cpp
+        ${SS_SRC}/app/gui/mask/MaskAdd.cpp
+        ${SS_SRC}/app/gui/mask/MaskSam.cpp
+        ${SS_SRC}/app/gui/mask/MaskSession.cpp
+        ${SS_SRC}/app/gui/mask/MaskWindow.cpp
+        ${SS_SRC}/app/gui/edit/EditDoc.cpp
+        ${SS_SRC}/app/gui/edit/SelectShape.cpp
+        ${SS_SRC}/app/gui/edit/Selection.cpp
+        ${SS_SRC}/app/FrameMask.cpp
+        ${SS_SRC}/app/FrameMaskSvg.cpp
+        ${SS_SRC}/app/FrameLook.cpp
+        ${SS_SRC}/app/gui/mask/Livewire.cpp
+        ${SS_SRC}/app/gui/mask/PathTool.cpp
+        ${SS_SRC}/app/gui/Picture.cpp
+        ${SS_SRC}/app/gui/mask/MaskSlideshow.cpp)
+    ss_configure_app(mask_doc_test)
+
+    # DatasetPrep's two seams with the mask editor's layer folder, run for
+    # real. Built without SS_BUILD_SAM or the video decoder: no model.
+    add_executable(dataset_prep_test
+        ${SS_SRC}/app/gui/tests/dataset_prep_test.cpp
+        ${SS_SRC}/app/gui/DatasetPrep.cpp
+        ${SS_SRC}/app/gui/FrameSelect.cpp
+        ${SS_SRC}/app/gui/PrepProgress.cpp
+        ${SS_SRC}/app/gui/ReconStamp.cpp
+        ${SS_SRC}/app/gui/Subprocess.cpp
+        ${SS_SRC}/app/gui/mask/MaskLayer.cpp
+        ${SS_SRC}/app/FrameMask.cpp
+        ${SS_SRC}/app/FrameMaskSvg.cpp
+        ${SS_SRC}/app/FrameLook.cpp
+        ${SS_SRC}/app/FrameMotion.cpp
+        ${SS_SRC}/app/Pano360.cpp)
+    ss_configure_app(dataset_prep_test)
 endif()

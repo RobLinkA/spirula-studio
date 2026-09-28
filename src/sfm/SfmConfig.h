@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "sfm/core/CameraSetup.h"
+#include "sfm/core/Sequence.h"
 #include "sfm/feature/Matcher.h"
 #include "sfm/feature/Extractor.h"
 #include "sfm/feature/LearnedMatcher.h"
@@ -123,8 +124,8 @@ struct SfmConfig {
     // is what the detectors and the AI models were trained on.
     std::string image_gamut = "Rec.709";
     bool image_is_linear = false;
-    // "srgb" leaves point colours there; "image" writes them back in the
-    // photographs' space (trainer: convert_initial_point_cloud_color off).
+    // "srgb" leaves point colours there (trainer: point_color_gamut Rec.709);
+    // "image" writes them back in the photographs' space, the trainer's default.
     std::string point_color_space = "srgb";
 
     // Camera setup. The string forms are what the table and the GUI see; the
@@ -153,6 +154,9 @@ struct SfmConfig {
     // Write the finished model in an upright, centred, unit-sized frame rather
     // than in whatever gauge the seed pair left it in (map/Orient.h).
     bool orient = true;
+    // What levels a model nothing measured: "ground" (the plane its points
+    // stand on, the walls and the footprint) or "cameras" (their mean up axis).
+    std::string level = "ground";
     // What each image's EXIF Orientation is worth: "none", "orient" (the up
     // direction only, pixels untouched) or "apply" (turn the pixels).
     // docs/datasets.md, "EXIF orientation".
@@ -182,6 +186,10 @@ struct SfmConfig {
     // adjustment with every image on its own pose.
     std::vector<RigDef> rigs;
     bool final_free_rig = false;
+    // Sequences (sfm/core/Sequence.h, D79): --sequence and the manifest, the
+    // same way. Matching takes each one's temporal window; the mapper trusts
+    // neighbours first. Empty leaves both exactly as they were.
+    std::vector<SequenceDef> sequences;
     bool merge_ba = true;               // merge: bundle-adjust across the seams
     bool in_place = false;              // merge: write back over the input
 
@@ -299,7 +307,8 @@ struct SfmConfig {
       "individual|video|internet", data_type)                                                      \
     F(pairs, "pairs", CMD_AUTO | CMD_MATCH, Tier::Basic, "pipeline", 0, 0,                         \
       "auto|exhaustive|sequential|prefilter", pairs)                                               \
-    F(overlap, "overlap", CMD_AUTO | CMD_MATCH, Tier::Advanced, "pipeline", 1, 1000000, "",        \
+    F(overlap, "overlap", CMD_AUTO | CMD_MATCH | CMD_MAP, Tier::Advanced, "pipeline", 1, 1000000, \
+      "",                                                                                          \
       overlap)                                                                                     \
     F(loop_closure, "loop-closure", CMD_AUTO | CMD_MATCH, Tier::Advanced, "pipeline", 0, 0, "",    \
       loop_closure)                                                                                \
@@ -425,6 +434,8 @@ struct SfmConfig {
       Tier::Advanced, "mapper", 0, 0, "", final_per_image_intrinsics)                              \
     F(orient, "orient", CMD_AUTO | CMD_MAP | CMD_MERGE, Tier::Advanced, "mapper", 0, 0, "",        \
       orient)                                                                                      \
+    F(level, "level", CMD_AUTO | CMD_MAP | CMD_MERGE, Tier::Advanced, "mapper", 0, 0,              \
+      "ground|cameras", level)                                                                     \
     F(metric_positions, "metric-positions", CMD_AUTO | CMD_MAP | CMD_MERGE, Tier::Advanced,        \
       "mapper", 0, 0, "", metric_positions)                                                        \
     F(metric_gps, "metric-gps", CMD_AUTO | CMD_MAP | CMD_MERGE, Tier::Advanced, "mapper", 0, 0,    \

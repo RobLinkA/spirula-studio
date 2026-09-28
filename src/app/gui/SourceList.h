@@ -17,9 +17,12 @@
 namespace gui {
 
 // Every input carries a concrete lens, so a list holding a 360 camera and a
-// phone cannot end up applying one of them to the other. An Insta360 .insv
-// splits into one folder per fisheye track, which the thin-prism model fits.
-std::string default_lens(const std::string& path);
+// phone cannot end up applying one of them to the other. An Insta360 capture
+// splits into one folder per fisheye lens, which the thin-prism model fits.
+std::string default_lens(const PrepInput& s);
+
+// A packed video's lenses, from its frame size: two start as a rig of their own.
+void set_packed_lenses(PrepInput& s, int width, int height);
 
 // One picked path -> the input it describes, with the defaults its kind wants.
 // A folder resolves to the images/ under it and the masks beside them, which
@@ -38,6 +41,11 @@ void assign_source_subdirs(std::vector<PrepInput>& sources);
 // The camera folders found INSIDE each input, refreshed against what is on
 // disk: a capture that arrives split into cam0/, cam1/ is several cameras.
 void refresh_subcameras(std::vector<PrepInput>& sources);
+
+// Give the photo folders that look like one rig's lenses (RigGuess.h) a shared
+// letter each. `force` replaces the rigs already chosen; otherwise a list
+// where any folder is on a rig is left alone, since that was the user's call.
+void guess_source_rigs(std::vector<PrepInput>& sources, bool force);
 
 // The output folder this list implies, and whether that folder is the dataset
 // itself (a picked images/ has its reconstruction written beside it) rather
@@ -66,9 +74,9 @@ bool sources_look_equirect(const std::vector<PrepInput>& sources,
 void normalize_source_lenses(std::vector<PrepInput>& sources,
                              std::string& camera_model);
 
-// The same for the kept frame rate, whose "^" is a per-input 0. The first VIDEO
-// row's rate lives in `video_fps` rather than in the row, because that is what
-// a preset saves and what every item of a batch then starts from.
+// The same for the kept frame rate: "^" is a per-input 0, and the first VIDEO
+// row's rate lives in `video_fps` (0 = every frame) rather than in the row,
+// because that is what a preset saves and what every batch item starts from.
 void normalize_source_fps(std::vector<PrepInput>& sources, float& video_fps);
 
 // One lens for the whole capture, written to every input rather than only the

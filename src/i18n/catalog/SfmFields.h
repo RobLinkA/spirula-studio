@@ -177,19 +177,41 @@ SS_MSG(pairs_help,
        "kapatmayla), diğer durumlarda exhaustive demektir"));
 
 SS_MSG(overlap_help,
-    EN("Neighbours each image is paired with under --pairs sequential"),
-    JA("--pairs sequential のとき各画像がペアを組む近傍の数"),
-    ZH_HANS("在 --pairs sequential 下，每张图像与多少个相邻图像配对"),
-    ZH_HANT("在 --pairs sequential 下，每張影像與多少個相鄰影像配對"),
-    KO("--pairs sequential 일 때 각 이미지가 짝을 이루는 이웃의 수"),
-    DE("Nachbarn, mit denen jedes Bild unter --pairs sequential gepaart wird"),
-    FR("Voisins avec lesquels chaque image est appariée sous --pairs sequential"),
-    ES("Vecinos con los que se empareja cada imagen bajo --pairs sequential"),
-    PT("Vizinhos com que cada imagem é emparelhada sob --pairs sequential"),
-    IT("Vicini con cui ogni immagine viene abbinata sotto --pairs sequential"),
-    NL("Buren waarmee elk beeld gepaard wordt onder --pairs sequential"),
-    RU("Сколько соседей получает каждое изображение при --pairs sequential"),
-    TR("--pairs sequential altında her görüntünün eşleştiği komşu sayısı"));
+    EN("Neighbours each image is paired with under --pairs sequential and along a "
+       "--sequence, and how far apart two images of a sequence still count as "
+       "neighbours in mapping"),
+    JA("--pairs sequential および --sequence に沿って各画像がペアを組む近傍の数、"
+       "またマッピングでシーケンスの 2 画像を近傍とみなす最大の間隔"),
+    ZH_HANS("在 --pairs sequential 下以及沿 --sequence，每张图像与多少个相邻图像配对；"
+            "也是建图时序列中两张图像相隔多远仍算相邻"),
+    ZH_HANT("在 --pairs sequential 下以及沿 --sequence，每張影像與多少個相鄰影像配對；"
+            "也是建圖時序列中兩張影像相隔多遠仍算相鄰"),
+    KO("--pairs sequential 일 때와 --sequence 를 따라 각 이미지가 짝을 이루는 이웃의 수, "
+       "그리고 매핑에서 시퀀스의 두 이미지가 얼마나 떨어져도 이웃으로 치는지"),
+    DE("Nachbarn, mit denen jedes Bild unter --pairs sequential und entlang einer "
+       "--sequence gepaart wird, und wie weit zwei Bilder einer Sequenz beim Mapping "
+       "noch als Nachbarn gelten"),
+    FR("Voisins avec lesquels chaque image est appariée sous --pairs sequential et le "
+       "long d'une --sequence, et jusqu'à quel écart deux images d'une séquence "
+       "comptent encore comme voisines au mapping"),
+    ES("Vecinos con los que se empareja cada imagen bajo --pairs sequential y a lo "
+       "largo de una --sequence, y a qué distancia dos imágenes de una secuencia aún "
+       "cuentan como vecinas al mapear"),
+    PT("Vizinhos com que cada imagem é emparelhada sob --pairs sequential e ao longo "
+       "de uma --sequence, e a que distância duas imagens de uma sequência ainda "
+       "contam como vizinhas no mapeamento"),
+    IT("Vicini con cui ogni immagine viene abbinata sotto --pairs sequential e lungo "
+       "una --sequence, e a quale distanza due immagini di una sequenza contano "
+       "ancora come vicine nel mapping"),
+    NL("Buren waarmee elk beeld gepaard wordt onder --pairs sequential en langs een "
+       "--sequence, en hoe ver twee beelden van een reeks bij het mappen nog als "
+       "buren gelden"),
+    RU("Сколько соседей получает каждое изображение при --pairs sequential и вдоль "
+       "--sequence, и на каком расстоянии два изображения последовательности ещё "
+       "считаются соседями при построении"),
+    TR("--pairs sequential altında ve bir --sequence boyunca her görüntünün eşleştiği "
+       "komşu sayısı ve haritalamada bir dizinin iki görüntüsünün ne kadar uzakken "
+       "hâlâ komşu sayıldığı"));
 
 SS_MSG(loop_closure_help,
     EN("Under --pairs sequential, also match the content-similar pairs GPU pair "
@@ -604,43 +626,44 @@ SS_MSG(image_linear_help,
     TR("Girdi görüntülerini ekran kodlu değil, doğrusal ışık olarak ele al"));
 
 SS_MSG(point_color_help,
-    EN("Colour space the sparse point cloud is written in. srgb matches the "
-       "trainer's convert-initial-point-cloud-color; image writes the points "
-       "in the same space as the photographs"),
-    JA("疎な点群を書き出す色空間。srgb は学習側の "
-       "convert-initial-point-cloud-color に対応し、image は写真と同じ空間で"
-       "書き出します"),
-    ZH_HANS("稀疏点云写出的色彩空间。srgb 与训练端的 "
-            "convert-initial-point-cloud-color 对应，image 则与照片同一空间"),
-    ZH_HANT("稀疏點雲寫出的色彩空間。srgb 與訓練端的 "
-            "convert-initial-point-cloud-color 對應，image 則與照片同一空間"),
-    KO("희소 점 구름을 기록할 색 공간. srgb 는 학습 쪽의 "
-       "convert-initial-point-cloud-color 에 대응하고, image 는 사진과 같은 "
-       "공간으로 씁니다"),
-    DE("Farbraum, in dem die dünne Punktwolke geschrieben wird. srgb passt zu "
-       "convert-initial-point-cloud-color des Trainings; image schreibt die "
-       "Punkte im Raum der Fotos"),
-    FR("Espace colorimétrique du nuage de points épars. srgb correspond au "
-       "convert-initial-point-cloud-color de l'entraînement ; image écrit les "
-       "points dans l'espace des photographies"),
-    ES("Espacio de color del nube de puntos dispersa. srgb concuerda con el "
-       "convert-initial-point-cloud-color del entrenamiento; image escribe los "
-       "puntos en el espacio de las fotografías"),
-    PT("Espaço de cor da nuvem de pontos esparsa. srgb combina com o "
-       "convert-initial-point-cloud-color do treino; image escreve os pontos "
-       "no espaço das fotografias"),
-    IT("Spazio colore in cui è scritta la nuvola di punti sparsa. srgb combacia "
-       "con convert-initial-point-cloud-color dell'addestramento; image scrive "
-       "i punti nello spazio delle fotografie"),
-    NL("Kleurruimte waarin de dunne puntenwolk wordt geschreven. srgb sluit aan "
-       "op convert-initial-point-cloud-color van de training; image schrijft de "
-       "punten in de ruimte van de foto's"),
-    RU("Цветовое пространство разреженного облака точек. srgb соответствует "
-       "convert-initial-point-cloud-color обучения; image пишет точки в "
-       "пространстве фотографий"),
-    TR("Seyrek nokta bulutunun yazıldığı renk uzayı. srgb, eğitimdeki "
-       "convert-initial-point-cloud-color ile eşleşir; image noktaları "
-       "fotoğraflarla aynı uzayda yazar"));
+    EN("Colour space the sparse point cloud is written in. image writes the "
+       "points in the same space as the photographs, which the trainer assumes "
+       "by default; srgb needs the trainer's point-color-gamut set to Rec.709"),
+    JA("疎な点群を書き出す色空間。image は写真と同じ空間で書き出し、学習側は既定"
+       "でそう想定します。srgb では学習側の point-color-gamut を Rec.709 にする"
+       "必要があります"),
+    ZH_HANS("稀疏点云写出的色彩空间。image 与照片同一空间写出，训练端默认即如此"
+            "假定；srgb 则需把训练端的 point-color-gamut 设为 Rec.709"),
+    ZH_HANT("稀疏點雲寫出的色彩空間。image 與照片同一空間寫出，訓練端預設即如此"
+            "假定；srgb 則需把訓練端的 point-color-gamut 設為 Rec.709"),
+    KO("희소 점 구름을 기록할 색 공간. image 는 사진과 같은 공간으로 쓰며 학습 "
+       "쪽의 기본 가정도 그렇습니다. srgb 는 학습 쪽 point-color-gamut 을 "
+       "Rec.709 로 설정해야 합니다"),
+    DE("Farbraum, in dem die dünne Punktwolke geschrieben wird. image schreibt "
+       "die Punkte im Raum der Fotos, wovon das Training standardmäßig ausgeht; "
+       "srgb braucht im Training point-color-gamut auf Rec.709"),
+    FR("Espace colorimétrique du nuage de points épars. image écrit les points "
+       "dans l'espace des photographies, ce que l'entraînement suppose par "
+       "défaut ; srgb demande point-color-gamut sur Rec.709 à l'entraînement"),
+    ES("Espacio de color de la nube de puntos dispersa. image escribe los "
+       "puntos en el espacio de las fotografías, que el entrenamiento supone por "
+       "defecto; srgb necesita point-color-gamut en Rec.709 al entrenar"),
+    PT("Espaço de cor da nuvem de pontos esparsa. image escreve os pontos no "
+       "espaço das fotografias, que o treino supõe por omissão; srgb precisa de "
+       "point-color-gamut em Rec.709 no treino"),
+    IT("Spazio colore in cui è scritta la nuvola di punti sparsa. image scrive "
+       "i punti nello spazio delle fotografie, che l'addestramento presume per "
+       "impostazione predefinita; srgb richiede point-color-gamut su Rec.709 "
+       "nell'addestramento"),
+    NL("Kleurruimte waarin de dunne puntenwolk wordt geschreven. image schrijft "
+       "de punten in de ruimte van de foto's, waar de training standaard van "
+       "uitgaat; srgb vraagt point-color-gamut op Rec.709 in de training"),
+    RU("Цветовое пространство разреженного облака точек. image пишет точки в "
+       "пространстве фотографий, что обучение предполагает по умолчанию; для "
+       "srgb при обучении нужен point-color-gamut Rec.709"),
+    TR("Seyrek nokta bulutunun yazıldığı renk uzayı. image noktaları "
+       "fotoğraflarla aynı uzayda yazar, eğitim varsayılan olarak bunu kabul "
+       "eder; srgb için eğitimde point-color-gamut Rec.709 olmalıdır"));
 
 // ===========================================================================
 // camera
@@ -1687,6 +1710,69 @@ SS_MSG(orient_help,
        "по позам камер, а не в произвольной калибровке начальной пары"),
     TR("Modeli, başlangıç çiftinin gelişigüzel ölçeği yerine, kamera "
        "duruşlarından doğrultulmuş, ortalanmış ve birim ölçekli olarak yaz"));
+
+SS_MSG(level_help,
+    EN("What levels a model nothing measured, and where a measured one's ground "
+       "goes: `ground` finds the plane the points stand on, puts it at z = 0, "
+       "turns the walls onto the axes and centres the footprint (a sensor-"
+       "levelled model is only moved up or down); `cameras` levels on the "
+       "cameras' mean up axis"),
+    JA("何も測っていないモデルを何で水平にするか、また測ったモデルの地面をどこに置くか。"
+       "`ground` は点が立つ平面を見つけて z = 0 に置き、壁を軸にそろえ、足元を中心に"
+       "寄せます (センサーで水平にしたモデルは上下に動かすだけ)。`cameras` はカメラの"
+       "平均上方向で水平にします"),
+    ZH_HANS("未经测量的模型用什么调平，已测量的模型的地面放在哪里：`ground` 找到点所"
+            "在的平面，放到 z = 0，把墙对齐到坐标轴并让占地居中（由传感器调平的模型只"
+            "上下移动）；`cameras` 按相机的平均上方向调平"),
+    ZH_HANT("未經測量的模型用什麼調平，已測量的模型的地面放在哪裡：`ground` 找到點所"
+            "在的平面，放到 z = 0，把牆對齊到座標軸並讓佔地置中（由感測器調平的模型只"
+            "上下移動）；`cameras` 按相機的平均上方向調平"),
+    KO("아무것도 측정하지 않은 모델을 무엇으로 수평 맞출지, 측정한 모델의 바닥을 어디에 둘지: "
+       "`ground` 는 점들이 선 평면을 찾아 z = 0 에 두고 벽을 축에 맞추며 바닥 영역을 가운데로 "
+       "옮깁니다 (센서로 수평 맞춘 모델은 위아래로만 옮김). `cameras` 는 카메라의 평균 위 "
+       "방향으로 맞춥니다"),
+    DE("Womit ein Modell ausgerichtet wird, das nichts gemessen hat, und wohin der "
+       "Boden eines gemessenen kommt: `ground` sucht die Ebene, auf der die Punkte "
+       "stehen, legt sie auf z = 0, dreht die Wände auf die Achsen und zentriert "
+       "die Grundfläche (ein von Sensoren ausgerichtetes Modell wird nur auf- oder "
+       "abwärts verschoben); `cameras` richtet an der mittleren Oben-Achse der "
+       "Kameras aus"),
+    FR("Ce qui met de niveau un modèle que rien n'a mesuré, et où va le sol d'un "
+       "modèle mesuré : `ground` trouve le plan sur lequel reposent les points, le "
+       "place à z = 0, tourne les murs sur les axes et centre l'emprise (un modèle "
+       "mis de niveau par les capteurs est seulement monté ou descendu) ; "
+       "`cameras` met de niveau sur l'axe haut moyen des caméras"),
+    ES("Qué nivela un modelo que nada midió, y dónde va el suelo de uno medido: "
+       "`ground` encuentra el plano sobre el que están los puntos, lo pone en "
+       "z = 0, gira las paredes hacia los ejes y centra la planta (un modelo "
+       "nivelado por sensores solo se sube o se baja); `cameras` nivela según el "
+       "eje arriba medio de las cámaras"),
+    PT("O que nivela um modelo que nada mediu, e para onde vai o chão de um "
+       "medido: `ground` encontra o plano sobre o qual os pontos estão, põe-no em "
+       "z = 0, gira as paredes para os eixos e centra a planta (um modelo "
+       "nivelado por sensores só é subido ou descido); `cameras` nivela pelo "
+       "eixo para cima médio das câmeras"),
+    IT("Che cosa mette in bolla un modello che nulla ha misurato, e dove va il "
+       "suolo di uno misurato: `ground` trova il piano su cui poggiano i punti, "
+       "lo porta a z = 0, gira le pareti sugli assi e centra l'ingombro (un "
+       "modello livellato dai sensori viene solo alzato o abbassato); `cameras` "
+       "livella sull'asse alto medio delle camere"),
+    NL("Waarmee een model wordt waterpas gezet dat niets heeft gemeten, en waar "
+       "de grond van een gemeten model komt: `ground` zoekt het vlak waarop de "
+       "punten staan, legt het op z = 0, draait de muren op de assen en "
+       "centreert de voetafdruk (een door sensoren waterpas gezet model gaat "
+       "alleen omhoog of omlaag); `cameras` zet waterpas op de gemiddelde "
+       "omhoog-as van de camera's"),
+    RU("Чем выравнивать модель, которую ничто не измерило, и куда поместить землю "
+       "измеренной: `ground` находит плоскость, на которой стоят точки, кладёт её "
+       "на z = 0, поворачивает стены к осям и центрирует площадь (модель, "
+       "выровненную датчиками, только сдвигает вверх или вниз); `cameras` "
+       "выравнивает по средней оси «вверх» камер"),
+    TR("Hiçbir şeyin ölçmediği bir modeli neyin düzleyeceği ve ölçülmüş birinin "
+       "zemininin nereye gideceği: `ground` noktaların üzerinde durduğu düzlemi "
+       "bulur, z = 0'a koyar, duvarları eksenlere çevirir ve taban alanını "
+       "ortalar (sensörlerin düzlediği model yalnızca yukarı ya da aşağı "
+       "kaydırılır); `cameras` kameraların ortalama yukarı eksenine göre düzler"));
 
 SS_MSG(min_tri_angle_help,
     EN("Triangulation angle a 3D point must subtend to be kept"),

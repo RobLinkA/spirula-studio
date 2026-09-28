@@ -51,6 +51,13 @@ bool is_splat_ply(const std::string& path);
 // mesher only needs geometry and DC colour.
 SplatCloud read_splat_ply(const std::string& path, bool want_sh = true);
 
+// The layout read_splat_ply expects and EngineCheckpoint.cpp also writes: one
+// format, so a change to either belongs in both. `keep` is a flag per splat;
+// `moved` is applied row by row, so baking a placement needs no second copy.
+void write_splat_ply(const SplatCloud& c, const std::string& path,
+                     const uint8_t* keep = nullptr,
+                     const class SplatTransform* moved = nullptr);
+
 // Resolve what a user pointed at into (splat.ply, run directory): a .ply
 // directly, a step-*.ckpt / *.ckpt directory holding one, or a run directory
 // whose newest checkpoint has one. The run directory is where config.json is

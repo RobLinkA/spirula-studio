@@ -1598,6 +1598,51 @@ SS_MSG(orient_done,
     RU("Модель {0}: выровнена и центрирована по камерам, масштаб {1}"),
     TR("Model {0}: kameralara göre düzlendi ve ortalandı, {1} ile ölçeklendi"));
 
+SS_MSG(orient_ground,
+    EN("Model {0}: levelled on the ground plane ({1}% of the points), scaled by {2}"),
+    JA("モデル {0}: 地面の平面 (点の {1}%) に合わせて水平にし、{2} 倍に縮尺しました"),
+    ZH_HANS("模型 {0}: 已按地面平面（{1}% 的点）调平，缩放 {2} 倍"),
+    ZH_HANT("模型 {0}: 已依地面平面（{1}% 的點）調平，縮放 {2} 倍"),
+    KO("모델 {0}: 바닥 평면 (점의 {1}%) 에 맞춰 수평을 잡고 {2} 배로 조정했습니다"),
+    DE("Modell {0}: an der Bodenebene ausgerichtet ({1} % der Punkte), um {2} skaliert"),
+    FR("Modèle {0} : mis de niveau sur le plan du sol ({1} % des points), mis à l'échelle de {2}"),
+    ES("Modelo {0}: nivelado sobre el plano del suelo ({1} % de los puntos), escalado por {2}"),
+    PT("Modelo {0}: nivelado pelo plano do chão ({1}% dos pontos), escalado por {2}"),
+    IT("Modello {0}: livellato sul piano del suolo ({1}% dei punti), scalato di {2}"),
+    NL("Model {0}: waterpas gezet op het grondvlak ({1}% van de punten), geschaald met {2}"),
+    RU("Модель {0}: выровнена по плоскости земли ({1}% точек), масштаб {2}"),
+    TR("Model {0}: zemin düzlemine göre düzlendi (noktaların %{1}'i), {2} ile ölçeklendi"));
+
+SS_MSG(orient_ground_missed,
+    EN("Model {0}: no ground plane found, levelled on the cameras instead"),
+    JA("モデル {0}: 地面の平面が見つからないため、カメラに合わせて水平にしました"),
+    ZH_HANS("模型 {0}: 未找到地面平面，改按相机调平"),
+    ZH_HANT("模型 {0}: 未找到地面平面，改依相機調平"),
+    KO("모델 {0}: 바닥 평면을 찾지 못해 카메라에 맞춰 수평을 잡았습니다"),
+    DE("Modell {0}: keine Bodenebene gefunden, stattdessen an den Kameras ausgerichtet"),
+    FR("Modèle {0} : aucun plan de sol trouvé, mis de niveau sur les caméras à la place"),
+    ES("Modelo {0}: no se encontró plano del suelo; nivelado según las cámaras"),
+    PT("Modelo {0}: nenhum plano do chão encontrado; nivelado pelas câmeras"),
+    IT("Modello {0}: nessun piano del suolo trovato, livellato sulle fotocamere"),
+    NL("Model {0}: geen grondvlak gevonden, in plaats daarvan waterpas gezet op de camera's"),
+    RU("Модель {0}: плоскость земли не найдена, выровнена по камерам"),
+    TR("Model {0}: zemin düzlemi bulunamadı, bunun yerine kameralara göre düzlendi"));
+
+SS_MSG(orient_ground_height,
+    EN("Model {0}: ground plane put at z = 0 ({1}% of the points)"),
+    JA("モデル {0}: 地面の平面 (点の {1}%) を z = 0 に置きました"),
+    ZH_HANS("模型 {0}: 已把地面平面（{1}% 的点）放到 z = 0"),
+    ZH_HANT("模型 {0}: 已把地面平面（{1}% 的點）放到 z = 0"),
+    KO("모델 {0}: 바닥 평면 (점의 {1}%) 을 z = 0 에 두었습니다"),
+    DE("Modell {0}: Bodenebene auf z = 0 gelegt ({1} % der Punkte)"),
+    FR("Modèle {0} : plan du sol placé à z = 0 ({1} % des points)"),
+    ES("Modelo {0}: plano del suelo puesto en z = 0 ({1} % de los puntos)"),
+    PT("Modelo {0}: plano do chão posto em z = 0 ({1}% dos pontos)"),
+    IT("Modello {0}: piano del suolo portato a z = 0 ({1}% dei punti)"),
+    NL("Model {0}: grondvlak op z = 0 gelegd ({1}% van de punten)"),
+    RU("Модель {0}: плоскость земли помещена на z = 0 ({1}% точек)"),
+    TR("Model {0}: zemin düzlemi z = 0'a kondu (noktaların %{1}'i)"));
+
 SS_MSG(sum_header,
     EN("Summary"),      JA("まとめ"),      ZH_HANS("小结"),    ZH_HANT("小結"),
     KO("요약"),          DE("Zusammenfassung"), FR("Récapitulatif"), ES("Resumen"),
@@ -3621,6 +3666,66 @@ SS_MSG(run_cancelled,
     NL("Afgebroken; de werkmap bevat wat de run af had"),
     RU("Отменено; в рабочем каталоге осталось то, что успел закончить запуск"),
     TR("İptal edildi; çalışma klasöründe çalışmanın bitirdiği kadarı duruyor"));
+
+
+SS_MSG(sequence_table,
+    EN("Sequence {0}: members {1}; images {2} over {3} positions; neighbours within {4}"),
+    JA("シーケンス {0}: メンバー {1}、画像 {2} 枚、位置 {3} 個、近傍は {4} 以内"),
+    ZH_HANS("序列 {0}: 成员 {1}; 图像 {2} 张，位置 {3} 个; 相邻范围 {4}"),
+    ZH_HANT("序列 {0}: 成員 {1}; 影像 {2} 張，位置 {3} 個; 相鄰範圍 {4}"),
+    KO("시퀀스 {0}: 멤버 {1}, 이미지 {2}개, 위치 {3}개, 이웃 범위 {4}"),
+    DE("Sequenz {0}: Mitglieder {1}; {2} Bilder über {3} Positionen; Nachbarn innerhalb {4}"),
+    FR("Séquence {0} : membres {1} ; {2} images sur {3} positions ; voisines à {4} au plus"),
+    ES("Secuencia {0}: miembros {1}; {2} imágenes en {3} posiciones; vecinas hasta {4}"),
+    PT("Sequência {0}: membros {1}; {2} imagens em {3} posições; vizinhas até {4}"),
+    IT("Sequenza {0}: membri {1}; {2} immagini su {3} posizioni; vicine entro {4}"),
+    NL("Reeks {0}: leden {1}; {2} beelden over {3} posities; buren binnen {4}"),
+    RU("Последовательность {0}: элементы {1}; изображений {2} на {3} позициях; соседи в пределах {4}"),
+    TR("Dizi {0}: üyeler {1}; {3} konumda {2} görüntü; {4} içindeki komşular"));
+
+SS_MSG(map_sequence_summary,
+    EN("Poses the sequence neighbours settled against the rest of the model: {0}; "
+       "registrations they carried past the inlier ratio: {1}"),
+    JA("モデルの他の部分に対してシーケンスの近傍が確定した姿勢: {0}、"
+       "近傍がインライア率の門を通した登録: {1}"),
+    ZH_HANS("由序列相邻帧而非模型其余部分决定的位姿: {0}; 由相邻帧担保通过内点率门槛的注册: {1}"),
+    ZH_HANT("由序列相鄰影格而非模型其餘部分決定的姿態: {0}; 由相鄰影格擔保通過內點率門檻的註冊: {1}"),
+    KO("모델의 나머지가 아닌 시퀀스 이웃이 정한 자세: {0}, 이웃이 인라이어 비율 문턱을 넘겨 준 등록: {1}"),
+    DE("Posen, die die Sequenznachbarn gegen den Rest des Modells entschieden: {0}; "
+       "Registrierungen, die sie über die Inlier-Quote trugen: {1}"),
+    FR("Poses tranchées par les voisines de séquence contre le reste du modèle : {0} ; "
+       "enregistrements qu'elles ont fait passer le taux d'inliers : {1}"),
+    ES("Poses decididas por las vecinas de la secuencia frente al resto del modelo: {0}; "
+       "registros que hicieron pasar la proporción de inliers: {1}"),
+    PT("Poses decididas pelas vizinhas da sequência contra o resto do modelo: {0}; "
+       "registos que elas levaram além da proporção de inliers: {1}"),
+    IT("Pose decise dalle vicine di sequenza contro il resto del modello: {0}; "
+       "registrazioni che hanno fatto passare la quota di inlier: {1}"),
+    NL("Poses die de reeksburen tegen de rest van het model beslisten: {0}; "
+       "registraties die zij voorbij de inlier-verhouding droegen: {1}"),
+    RU("Поз, решённых соседями по последовательности вопреки остальной модели: {0}; "
+       "регистраций, проведённых ими мимо порога доли инлайеров: {1}"),
+    TR("Dizi komşularının modelin geri kalanına karşı belirlediği pozlar: {0}; "
+       "iç nokta oranını aşmalarını sağladıkları kayıtlar: {1}"));
+
+SS_MSG(match_sequence_added,
+    EN("sequence windows added pairs: {0}, on top of chosen pairs: {1} (window pairs: {2})"),
+    JA("シーケンスのウィンドウで追加したペア: {0}、選択済みペア: {1}（ウィンドウのペア: {2}）"),
+    ZH_HANS("序列窗口新增的像对：{0}，此外已选像对：{1}（窗口像对：{2}）"),
+    ZH_HANT("序列視窗新增的影像對：{0}，此外已選影像對：{1}（視窗影像對：{2}）"),
+    KO("시퀀스 창으로 더한 쌍: {0}, 선택된 쌍: {1}(창 쌍: {2})"),
+    DE("Sequenzfenster ergänzten Paare: {0}, zu gewählten Paaren: {1} (Fensterpaare: {2})"),
+    FR("les fenêtres de séquence ont ajouté des paires : {0}, en plus des paires "
+       "choisies : {1} (paires de fenêtre : {2})"),
+    ES("las ventanas de secuencia añadieron pares: {0}, además de los pares elegidos: {1} "
+       "(pares de ventana: {2})"),
+    PT("as janelas de sequência acrescentaram pares: {0}, além dos pares escolhidos: {1} "
+       "(pares de janela: {2})"),
+    IT("le finestre di sequenza hanno aggiunto coppie: {0}, oltre alle coppie scelte: {1} "
+       "(coppie di finestra: {2})"),
+    NL("reeksvensters voegden paren toe: {0}, bovenop gekozen paren: {1} (vensterparen: {2})"),
+    RU("окна последовательностей добавили пар: {0}, к выбранным парам: {1} (пар в окнах: {2})"),
+    TR("dizi pencereleri çift ekledi: {0}, seçilmiş çiftlere ek olarak: {1} (pencere çifti: {2})"));
 
 }  // namespace sfm
 }  // namespace msg

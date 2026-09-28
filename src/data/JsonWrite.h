@@ -6,8 +6,11 @@
 // handled, so the several settings files this program writes do not each
 // carry their own copy of them.
 
+#include "data/Json.h"
+
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -42,6 +45,18 @@ inline std::string json_number(double v) {
     if (std::isinf(v)) return v > 0 ? "Infinity" : "-Infinity";
     char buf[32];
     std::snprintf(buf, sizeof buf, "%.9g", v);
+    return buf;
+}
+
+// The shortest spelling that reads back as the same double: a document that
+// was parsed and is written again must not come back rounded.
+inline std::string json_number_exact(double v) {
+    if (std::isnan(v) || std::isinf(v)) return json_number(v);
+    char buf[40];
+    for (int digits = 15; digits <= 17; digits++) {
+        std::snprintf(buf, sizeof buf, "%.*g", digits, v);
+        if (std::strtod(buf, nullptr) == v) break;
+    }
     return buf;
 }
 
@@ -112,3 +127,28 @@ private:
     std::vector<Frame> _stack;
     bool _pending_key = false;
 };
+
+
+// A parsed document back out, for the one case that reads a file and writes
+// the same shape again: an edited Metashape export saved as Nerfstudio.
+inline void json_write(JsonWriter& w, const JsonValue& v) {
+    switch (v.type) {
+        case JsonValue::Type::Object:
+            w.object();
+            for (const auto& [k, sub] : v.obj) {
+                w.key(k.c_str());
+                json_write(w, sub);
+            }
+            w.end();
+            break;
+        case JsonValue::Type::Array:
+            w.array();
+            for (const auto& sub : v.arr) json_write(w, sub);
+            w.end();
+            break;
+        case JsonValue::Type::String: w.value(v.str); break;
+        case JsonValue::Type::Number: w.raw(json_number_exact(v.num)); break;
+        case JsonValue::Type::Bool:   w.value(v.b); break;
+        default:                      w.raw("null"); break;
+    }
+}

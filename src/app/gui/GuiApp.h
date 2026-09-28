@@ -24,6 +24,7 @@
 #include "app/gui/MeshRunner.h"
 #include "app/gui/ModelCache.h"
 #include "app/gui/SegmentPanel.h"
+#include "app/gui/mask/MaskSession.h"
 #include "app/gui/SfmRunner.h"
 #include "app/gui/SourceList.h"
 #include "app/gui/SourceProbe.h"
@@ -65,12 +66,21 @@ public:
     static constexpr float kDefaultLogH = 150.0f;
     static constexpr float kDefaultPreviewH = 260.0f;
     static constexpr float kDefaultDsPanelW = 560.0f;
+    static constexpr float kEditPanelW = 300.0f;
 
     GuiApp();
     ~GuiApp();
 
     // Draw one frame (between ImGui::NewFrame and ImGui::Render).
     void frame();
+    // Something is moving without the user touching anything -- a render
+    // playing back or being written -- so frames must keep coming.
+    bool animating() const { return _compare.animating() || _mask_editor.animating(); }
+
+    // What a script needs to know that is not on screen as a widget: the
+    // screen, what is running, what is open. A JSON object body without the
+    // braces, for gui::automation::set_state_source.
+    std::string state_json();
 
     // Window close button pressed; may open a confirmation dialog instead
     // of quitting when training is in flight.
@@ -99,7 +109,9 @@ private:
         PresetFile, DatasetPresetFile, MeshPresetFile, PresetSaveFolder,
         BatchDataset, BatchOutput, BatchPresetFile, BatchDatasetPresetFile,
         BatchMeshPresetFile, BatchSourceImages, BatchSourceVideo, BatchModel,
-        MeshSource, MeshPhotos, MeshOutput, AddSplatFile
+        MeshSource, MeshPhotos, MeshOutput, AddSplatFile, SplatFolder,
+        EditSaveFile, EditSaveFolder, RenderProjectSave, RenderProjectOpen,
+        RenderOutput, RenderAddModel, StencilFile
     };
     // Which reconstruction back end the New Dataset screen runs.
     enum class Engine { BuiltIn, Colmap };
@@ -131,7 +143,8 @@ private:
     void open_pick(PickAction a, const std::string& title,
                    FileDialog::Mode mode,
                    const std::vector<std::string>& extensions = {},
-                   const std::string& start_dir = "", bool multi = false);
+                   const std::string& start_dir = "", bool multi = false,
+                   const std::string& suggested_name = {});
 
     // ---- actions ----
     // By value: callers pass elements of _recents, which open_dataset
@@ -145,6 +158,11 @@ private:
     // Route for user-initiated opens: confirms first when training.
     void request_open_dataset(std::string dir);
 
+    // The comparison panes, with the editing panel beside them when a pane is
+    // being edited. The viewer screen and the meshing preview share it.
+    void draw_compare_panes();
+    void open_render_output_pick(const std::string& start, const std::string& suggested);
+
     // The viewer screen: a splat file (or a checkpoint / run directory) opened
     // for looking at. Takes the engine over, so it goes through the same
     // confirmation as any other session-destroying action.
@@ -157,6 +175,8 @@ private:
     void close_splat();
     // Close GPU-backed previews before another native handoff.
     void close_native_previews();
+    // close_native_previews(), and the mask editor releases its SAM session.
+    void stop_inference_users();
 
 public:
     // Drag-and-drop entry (GLFW drop callback, main thread): auto-detects
@@ -283,7 +303,7 @@ private:
     // Path of the selected checkpoint, or "" when it is not downloaded yet.
     std::string selected_model_path() const;
     // Fetch it (with consent), and whether a run would need it and not find it.
-    void request_model_download();
+    void request_model_download(const std::string& id);
     bool mask_model_missing() const;
     bool license_accepted(const std::string& family) const;
 
@@ -342,6 +362,8 @@ private:
     // "Re-run masking only" and friends: what probe_workspace already knows,
     // as the actions it implies.
     void draw_dataset_rerun(const WorkspaceState& prior);
+    void open_mask_editor(const std::string& workspace, const std::string& image_dir,
+                          const std::string& mask_dir, bool mask_flipped);
     // Throwing the whole project away rather than one step of it: the run's
     // own files, and the options, each on its own button.
     void draw_dataset_reset();
@@ -506,6 +528,38 @@ private:
     void clear_log();
 
     Screen _screen = Screen::Home;
+    // Which save target the editor's file picker was armed for, and whether
+    // the next model opened is being opened in order to edit it.
+    int _edit_save_target = 0;
+    bool _edit_after_open = false;
+    // The dataset screen's run behind a sparse edit it opened: its photos and
+    // masks may live outside the dataset, and training the edit needs them.
+    struct DatasetFolders {
+        std::string dir, image_dir, mask_dir;
+        bool mask_flipped = false;
+    };
+    DatasetFolders _sparse_edit_src;
+    // A dataset already in the output folder, read the way a run would read it.
+    DatasetFolders workspace_folders(const WorkspaceState& prior) const;
+    // Open in trainer / edit reconstruction / correct masks, for one dataset.
+    void draw_dataset_open_buttons(const DatasetFolders& f, bool model);
+    // A saved sparse edit on its way to the trainer: the dataset to open and
+    // the one it was edited from. Taken up at the top of the next frame,
+    // outside the edit session that asked for it.
+    std::string _edit_train_dataset, _edit_train_source;
+    void open_edited_dataset();
+    // The same, for a model opened in order to render it.
+    bool _render_after_open = false;
+    std::string _render_project_after_open;
+    bool open_render_project(const std::string& path);
+    // Quitting with unsaved edits: the question is asked before the training
+    // one, because the answer decides whether anything is written at all.
+    bool _edit_exit_confirm = false;
+    void draw_edit_exit_modal();
+    // The same for the render's camera move; "discard" lets it go for good.
+    bool _render_exit_confirm = false, _render_discarded = false;
+    bool _quit_after_render_save = false;
+    void draw_render_exit_modal();
     bool _quit = false;
     bool _open_confirm = false;      // arm the stop-training modal
     bool _confirm_shown = false;     // modal currently expected open
@@ -554,6 +608,9 @@ private:
     // the options editor's "preset default" tooltips are relative to.
     std::string _preset = "3dgs";
     ConfigUIState _cfg_ui;
+    // Persisted: the last value the user gave save_full_checkpoint by hand. A
+    // preset only overrides it by turning it on.
+    bool _keep_full_ckpt = false;
 
     // Saved presets, one picker per kind.
     PresetPicker<TrainPreset> _train_presets;
@@ -655,6 +712,9 @@ private:
     // that runs instead of a parallel copy of it: a video file or photo folder
     // each, plus the sub-folder and the lens that belong to it.
     std::vector<PrepInput> _sources;
+    // The photo folders rigs were last guessed for; guessed again only when
+    // they change, so clearing the guessed letters sticks.
+    std::string _rig_guess_key;
     // Keep the committed source stable while a path is edited.
     std::vector<std::string> _source_path_edits;
     // What an input row draws after its path box, as last measured: the
@@ -696,8 +756,21 @@ private:
     // stencil); this only says whether the run is given them, so that turning
     // the option off and on again does not throw away what was drawn.
     bool _border_enable = false;
+    // A saved stencil drawn on every input, by name (StencilPreset.h); cleared
+    // once the panel edits what it drew, since the name no longer says what is.
+    std::string _frame_shapes;
+    std::vector<StencilPreset> _frame_shapes_list;   // read when the picker opens
+    void apply_frame_shapes(size_t first_input = 0);
+    void save_run_stencils();
     MaskSettings _mask;
     SegmentPanel _segment;
+    // The mask correction editor (app/gui/mask/). Opened from the dataset
+    // screen and the train screen; drawn from frame() so both can reach it.
+    mask::MaskSession _mask_editor;
+    // draw_train()'s mask-folder probe: what it last checked, and when.
+    std::string _train_masks_key;
+    double _train_masks_at = -1.0;
+    bool _train_has_masks = false;
     // Which input "Try the mask" runs on: which input a new clicked object
     // prompts (MaskClick::source) and which one's stencil the panel edits.
     int _mask_preview_input = 0;
@@ -712,10 +785,11 @@ private:
     // remembered "could not tell", so nothing is probed twice.
     std::map<std::string, std::pair<int, int>> _input_size;
 
-    // The segmentation checkpoint in use. Not persisted -- neither is any
-    // other masking or geometry setting, so a fresh session never runs a
-    // model the last one happened to pick.
+    // The dataset run's checkpoint and the mask editor's (clicks, so the fast
+    // one). Not persisted, like every masking setting: a fresh session never
+    // runs a model the last one happened to pick.
     std::string _model_id = "sam3-q4_0";
+    std::string _mask_editor_model_id = "sam2.1-base-plus";
     ModelDownload _download;
 
     // Interface language and the glyphs to draw it with. The font download is
@@ -727,6 +801,7 @@ private:
     // Families whose licence the user has accepted, persisted in the settings.
     std::vector<std::string> _accepted_licenses;
     std::string _license_prompt;      // family whose modal is open
+    std::string _license_model_id;    // the checkpoint it downloads
     bool _license_tick = false;
 
     // Batch processing. The queue is data; the driver is advance_batch(), so a
@@ -819,6 +894,8 @@ private:
     // The New Dataset screen's own column width; the trainer's _panel_w is a
     // different screen with a different sensible size.
     float _ds_panel_w = kDefaultDsPanelW;
+    // The editing panel's own width, dragged like the other two.
+    float _edit_panel_w = kEditPanelW;
     bool _show_settings = true;
     bool _layout_dirty = false;      // a splitter moved -> persist once idle
     // The New Dataset screen's run/status band, measured last frame: the form

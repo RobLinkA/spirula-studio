@@ -353,6 +353,15 @@ bool fixGauge(std::vector<Reconstruction>& models, const SfmConfig& cfg,
     // turned the pixels, so only `orient` corrects anything. The tags arrive on
     // the models; a caller that read them off disk calls fillExifOrientations.
     const bool exif_up = cfg.exif_orientation == "orient";
+    const bool on_ground = cfg.level == "ground";
+    // The frame a model nothing measured is written in: upright on the
+    // cameras, then levelled on its ground where one is found.
+    auto unmeasured = [&](size_t i, GroundFit& g) {
+        const Sim3 T = uprightTransform(models[i], exif_up);
+        g = on_ground ? groundTransform(models[i], true, T) : GroundFit{};
+        return g.found ? composeSim3(g.T, T) : T;
+    };
+    std::vector<GroundFit> levelled(models.size());
 
     // `gauge[i]` is the state, not just the record: `oriented` and `metric` say
     // what a source has already settled, and every source below reads them
@@ -452,8 +461,7 @@ bool fixGauge(std::vector<Reconstruction>& models, const SfmConfig& cfg,
         // Horizontal mode takes the tilt from the caller's up axis, so its fit
         // -- scale, heading and place -- runs in an upright frame. Where a
         // sensor already levelled the model, that frame is the one it is in.
-        const Sim3 pre =
-            flat && !gauge[i].oriented ? uprightTransform(models[i], exif_up) : Sim3{};
+        const Sim3 pre = flat && !gauge[i].oriented ? unmeasured(i, levelled[i]) : Sim3{};
         for (Vec3& c : ref.centres) c = transformPoint(pre, c);
         const MetricFit fit =
             fitMetricGauge(ref, cfg.metric_max_error,
@@ -476,6 +484,9 @@ bool fixGauge(std::vector<Reconstruction>& models, const SfmConfig& cfg,
         if (!flat) {
             gauge[i].oriented = true;
             gauge[i].up = file ? "positions" : "gps";
+        } else if (levelled[i].found) {
+            gauge[i].oriented = true;
+            gauge[i].up = "ground";
         } else if (!gauge[i].oriented) {
             gauge[i].up = "cameras";
         }
@@ -512,12 +523,38 @@ bool fixGauge(std::vector<Reconstruction>& models, const SfmConfig& cfg,
     // ---- whatever no source settled ---------------------------------------
     // The only place that falls back on the cameras' mean up axis, so a model
     // something measured cannot be re-levelled by the guess it replaced.
+    std::vector<char> placed(models.size(), 0);
     if (cfg.orient)
         for (size_t i = 0; i < models.size(); i++) {
             if (gauge[i].oriented || gauge[i].metric) continue;
-            const Sim3 T = orientModel(models[i], exif_up);
+            GroundFit g;
+            const Sim3 T = unmeasured(i, g);
+            applySim3(models[i], T);
+            placed[i] = 1;
+            const long long model = (long long)i;
+            if (g.found) {
+                gauge[i].oriented = true;
+                gauge[i].up = "ground";
+                L::out(Tag::Orient, M::orient_ground,
+                       {model, (long long)std::lround(g.share * 100.0), L::num(T.scale, 4)});
+                continue;
+            }
             gauge[i].up = exif_up ? "cameras+exif" : "cameras";
-            if (verbose) L::err(Tag::Orient, M::orient_done, {(long long)i, L::num(T.scale, 4)});
+            if (on_ground) L::out(Tag::Orient, M::orient_ground_missed, {model});
+            else if (verbose) L::err(Tag::Orient, M::orient_done, {model, L::num(T.scale, 4)});
+        }
+
+    // A measured up keeps its tilt; only its height is free, unless a
+    // reference measured that too (a positions file, GPS altitude).
+    const bool height_measured = file || cfg.metric_gps == "full";
+    if (cfg.orient && on_ground && !height_measured)
+        for (size_t i = 0; i < models.size(); i++) {
+            if (placed[i] || !gauge[i].oriented) continue;
+            const GroundFit g = groundTransform(models[i], false);
+            if (!g.found) continue;
+            applySim3(models[i], g.T);
+            L::out(Tag::Orient, M::orient_ground_height,
+                   {(long long)i, (long long)std::lround(g.share * 100.0)});
         }
     return true;
 }
@@ -563,7 +600,7 @@ void reportFeatureCompaction(const FeatureCompactionStats& stats) {
 
 // Point colours are sampled from images the loader converted to sRGB, which is
 // where "srgb" leaves them. "image" puts them back in the photographs' space,
-// for a trainer run with convert_initial_point_cloud_color off.
+// which is where the trainer's point_color_* assume them by default.
 void recolorPoints(std::vector<Reconstruction>& models, const SfmConfig& cfg) {
     if (cfg.point_color_space != "image") return;
     if (colorspace::is_identity(cfg.image_gamut, cfg.image_is_linear)) return;
@@ -839,6 +876,25 @@ RigTable buildRigs(const MatchesDatabase& db, const SfmConfig& cfg, bool verbose
                 r.anyKnownExt() ? M::rig_ext_given.get() : M::rig_ext_estimated.get()});
     }
     return rigs;
+}
+
+SequenceTable buildSequences(const MatchesDatabase& db, const SfmConfig& cfg, bool verbose) {
+    std::vector<std::string> names;
+    names.reserve(db.images.size());
+    for (const ImageEntry& im : db.images) names.push_back(im.name);
+    SequenceTable seqs = buildSequenceTable(names, cfg.sequences);
+    if (!verbose) return seqs;
+    for (size_t k = 0; k < seqs.length.size(); k++) {
+        size_t images = 0;
+        for (int32_t id : seqs.seq) images += id == (int32_t)k ? 1 : 0;
+        std::string members;
+        for (const std::string& m : seqs.members[k])
+            members += (members.empty() ? "" : ", ") + (m.empty() ? std::string(".") : m);
+        L::out(Tag::Map, M::sequence_table,
+               {(long long)k, members, (long long)images, (long long)seqs.length[k],
+                (long long)cfg.overlap});
+    }
+    return seqs;
 }
 
 std::vector<Reconstruction> runMapper(Mapper& mapper, const MatchesDatabase& db,
@@ -1434,6 +1490,29 @@ int matchFeatureDir(const std::string& featdir, const SfmConfig& cfg, PairMode m
                         format_duration(stats.select_seconds)});
         }
     }
+    // makes the mapper trust the sequence pairs,
+    // but seems to make things less robust for datasets that already have a lot of pairs, so it's disabled for now
+#if 0
+    // A sequence's temporal window is matched whatever the mode chose: the
+    // mapper trusts those pairs first, so they have to exist (D79).
+    if (!reused_pairs && !cfg.sequences.empty()) {
+        const size_t before = pairs.size();
+        try {
+            const SequenceTable st = buildSequenceTable(image_names, cfg.sequences);
+            const std::vector<std::pair<uint32_t, uint32_t>> win =
+                sequenceWindowPairs(st, cfg.overlap, cfg.quadratic_overlap);
+            pairs.insert(pairs.end(), win.begin(), win.end());
+            std::sort(pairs.begin(), pairs.end());
+            pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+            if (verbose)
+                L::err(Tag::Match, M::match_sequence_added,
+                       {(long long)(pairs.size() - before), (long long)before,
+                        (long long)win.size()});
+        } catch (const std::exception&) {
+            // A definition the names do not fit is the mapper's to report.
+        }
+    }
+#endif
     if (res && !reused_pairs) resume::writePairs(res->dir / "pairs.bin", res->signature, pairs);
     stats.pairs = pairs.size();
     if (verbose)
@@ -1906,14 +1985,16 @@ AutoResult run_auto(SfmConfig& cfg, const AutoInputs& in) {
     events::stage_begin(Stage::Map, (int64_t)db.images.size());
     events::map_begin(db.images.size());
     RigTable rigs;
+    SequenceTable seqs;
     try {
         rigs = buildRigs(db, cfg, verbose);
+        seqs = buildSequences(db, cfg, verbose);
     } catch (const std::runtime_error& e) {
         L::fail(Tag::Map, M::rig_bad, {e.what()});
         r.exit_code = 2;
         return r;
     }
-    Mapper mapper(db, feats, mapopt, cs.ids, &rigs);
+    Mapper mapper(db, feats, mapopt, cs.ids, &rigs, &seqs);
     AssembleStats ast;
     std::vector<Reconstruction> models = runMapper(mapper, db, feats, cfg, ast);
     double t_map = now() - t0;
@@ -2140,6 +2221,14 @@ std::string parse_auto_args(const std::vector<std::string>& args, AutoRequest& o
             RigDef d;
             if (std::string err = parseRigArg(args[(size_t)++i], d); !err.empty()) return err;
             cfg.rigs.push_back(std::move(d));
+            continue;
+        }
+        if (a == "--sequence") {
+            if (i + 1 >= argc) return "--sequence: missing value";
+            SequenceDef d;
+            if (std::string err = parseSequenceArg(args[(size_t)++i], d); !err.empty())
+                return err;
+            cfg.sequences.push_back(std::move(d));
             continue;
         }
         if (a == "--progress-dir") {

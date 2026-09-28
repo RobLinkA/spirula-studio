@@ -21,11 +21,15 @@
 namespace app {
 
 struct MaskShape {
-    enum class Kind { Ellipse, Rect };
+    enum class Kind { Ellipse, Rect, Path, Stroke };
     Kind  kind = Kind::Ellipse;
     bool  remove = false;           // false = keep what is inside
     float cx = 0.5f, cy = 0.5f;     // rect: the two corners go in cx,cy / rx,ry
+    // Stroke: its half-width per axis, so a brush stays round on any aspect.
     float rx = 0.5f, ry = 0.5f;
+    // x,y pairs. Path: 3+ corners, closed, even-odd. Stroke: 1+ points of a
+    // round-capped polyline, what a brush drags.
+    std::vector<float> pts;
 };
 
 // Shapes are applied IN ORDER, each one adding its inside to what is kept or
@@ -41,11 +45,9 @@ struct FrameMask {
     bool empty() const { return shapes.empty() && image.empty(); }
 };
 
-// "ellipse 0.5,0.5,0.49,0.49; -rect 0.2,0.9,0.8,1": ';'-separated shapes, a
-// leading '-' meaning "remove what is inside this one". A rect takes its two
-// corners, an ellipse its centre and its two radii. FrameMask::image has no
-// spelling here -- it is a path, and carrying one through a ';'-separated
-// string is a quoting problem for no gain.
+// "ellipse 0.5,0.5,0.49,0.49; -rect 0.2,0.9,0.8,1; path 0.1,0.1,0.9,0.1,0.5,0.9":
+// ';'-separated, '-' removes. rect: two corners; ellipse: centre, radii; path:
+// 3+ corners; stroke: rx, ry, then 1+ points. The file form is app/FrameMaskSvg.h.
 bool parse_mask_shapes(const std::string& spec, std::vector<MaskShape>& out,
                        std::string& error);
 std::string format_mask_shapes(const std::vector<MaskShape>& shapes);
@@ -73,17 +75,19 @@ struct BorderDetectOptions {
     int   dark = 16;            // luma at or below this counts as black
     float shrink = 0.01f;       // pull the boundary in, fraction of its radius
     int   rays = 360;
-    float max_residual = 0.02f; // RMS radial fit error, fraction of the radius
+    float tolerance = 0.006f;   // a ray's edge this far off r is not on the circle
+    float min_support = 0.1f;   // fraction of the rays that must be on it
+    float max_outside = 0.3f;   // fraction of the frame past 1.1 r allowed to be busy
 };
 
-// How the border was told from the scene. Activity -- where the frame never
-// resolves anything -- leads; a lit flare ring outside the circle is not black.
-// Dark answers the capture too still for it.
+// How the lens was told from the scene. Activity leads and puts the edge where
+// the scene stops, inside any lit barrel; Dark answers a capture too still for
+// it, and stops at the black.
 enum class BorderCue { None, Dark, Activity };
 
 struct BorderDetect {
     bool      found = false;
-    MaskShape shape;             // keep-inside ellipse, `shrink` applied
+    MaskShape shape;             // keep-inside circle, `shrink` applied
     BorderCue cue = BorderCue::None;
     float     residual = 0.0f;
     float     dark_fraction = 0.0f;

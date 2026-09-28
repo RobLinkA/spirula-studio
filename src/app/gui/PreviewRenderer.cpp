@@ -5,6 +5,7 @@
 #include "app/gui/GlLoader.h"
 #include "app/TrainerCore.h"
 #include "data/CameraMath.h"
+#include "data/FrustumTemplate.h"
 #include "mesh/MeshImport.h"   // mesh_compute_normals
 
 #include <algorithm>
@@ -45,12 +46,46 @@ namespace {
 const char* kProj = R"(
 uniform int u_model;
 uniform vec2 u_s;
+uniform int u_tier;
+uniform float u_dist[8];
+// The engine's lens tiers (shaders/projection_utils.slang), in its CV
+// convention: y down, so the image's y is flipped around it.
+vec2 lens(vec2 gl) {
+    if (u_tier == 0) return gl;
+    float u = gl.x, v = -gl.y, r2 = u*u + v*v;
+    vec2 cv;
+    if (u_tier == 1) {
+        float k1 = u_dist[0], k2 = u_dist[1], p1 = u_dist[2], p2 = u_dist[3];
+        cv = vec2(u, v) * (1.0 + r2*(k1 + r2*k2)) +
+             vec2(2.0*p1*u*v + p2*(r2 + 2.0*u*u), 2.0*p2*u*v + p1*(r2 + 2.0*v*v));
+    } else {
+        float k1 = u_dist[0], k2 = u_dist[1], k3 = u_dist[2], k4 = u_dist[3];
+        float p1 = u_dist[4], p2 = u_dist[5], s1 = u_dist[6], s2 = u_dist[7];
+        cv = vec2(u, v) * (1.0 + r2*(k1 + r2*(k2 + r2*(k3 + r2*k4)))) +
+             vec2(2.0*p1*u*v + p2*(r2 + 2.0*u*u) + s1*r2,
+                  2.0*p2*u*v + p1*(r2 + 2.0*v*v) + s2*r2);
+    }
+    return vec2(cv.x, -cv.y);
+}
+// The engine's is_valid_distortion: where the lens folds over itself, which
+// it does not draw either. The y flip leaves the determinant, the diagonal
+// and the dot product as they are.
+bool lens_valid(vec2 gl) {
+    if (u_tier == 0) return true;
+    const float e = 1e-3;
+    vec2 f = lens(gl);
+    vec2 jx = (lens(gl + vec2(e, 0.0)) - f) / e, jy = (lens(gl + vec2(0.0, e)) - f) / e;
+    float jd = min(jx.x * jy.y - jy.x * jx.y, min(jx.x, jy.y));
+    return jd > 0.25 && jd < 4.0 && dot(gl, f) >= 0.0;
+}
 vec2 project_ndc(vec3 v, out bool clipped) {
     float dist = max(length(v), 1e-9);
     clipped = false;
     if (u_model == 0) {                     // pinhole
         if (v.z > -1e-6) clipped = true;
-        return u_s * (v.xy / -v.z);
+        vec2 q = v.xy / -v.z;
+        if (!lens_valid(q)) clipped = true;
+        return u_s * lens(q);
     } else if (u_model == 3) {              // equirectangular
         float lon = atan(v.x, -v.z);
         float lat = asin(clamp(v.y / dist, -1.0, 1.0));
@@ -60,7 +95,26 @@ vec2 project_ndc(vec3 v, out bool clipped) {
     float rlen = length(v.xy);
     vec2 dir2 = rlen > 1e-9 ? v.xy / rlen : vec2(0.0);
     float r = (u_model == 1) ? theta : 2.0 * sin(0.5 * theta);
-    return u_s * dir2 * r;
+    if (!lens_valid(dir2 * r)) clipped = true;
+    return u_s * lens(dir2 * r);
+}
+)";
+
+// Fragment stages only: a vertex shader may not hold a discard. A world-space
+// cut for the reveal effects -- past the plane is not drawn, and a band
+// before it glows.
+const char* kClip = R"(
+uniform int u_clip_on;
+uniform vec4 u_clip;
+uniform float u_glow;
+uniform vec3 u_glow_col;
+vec3 clip_colour(vec3 col, vec3 world) {
+    if (u_clip_on == 0) return col;
+    float s = dot(u_clip.xyz, world) - u_clip.w;
+    if (s > 0.0) discard;
+    if (u_glow > 0.0 && s > -u_glow)
+        col = mix(col, u_glow_col, 0.85 * (1.0 + s / u_glow));
+    return col;
 }
 )";
 
@@ -73,11 +127,28 @@ uniform float u_scale;
 uniform float u_dscale;
 uniform vec4 u_color;
 uniform vec2 u_zrange;
+uniform vec2 u_vp;
+uniform float u_psize;      // screen size of a point, pixels
+uniform float u_pradius;    // > 0: a sphere of this radius instead
+uniform int u_points;
 out vec4 v_col;
 out vec3 v_view;
+out vec3 v_world;
 out float v_kill;
+out float v_fxa;
+out float v_fxr;
 void main() {
     vec3 p = a_pos + u_scale * a_aux;
+    float fxs = 1.0;
+    v_fxa = 1.0;
+    v_fxr = 0.0;
+    if (u_fx != 0 && u_points > 0) {
+        float r1 = fx_hashu(uint(gl_VertexID)), r2 = fx_hashu(uint(gl_VertexID) ^ 0x9E3779B9u);
+        vec3 dd;
+        fx_apply(p, r1, r2, dd, v_fxa, fxs);
+        p += dd;
+        v_fxr = fract(r1 * 7.31 + r2);
+    }
     vec3 v = (u_view * vec4(p, 1.0)).xyz;
     float dist = max(length(v), 1e-9);
     bool clipped;
@@ -86,6 +157,13 @@ void main() {
     if (clipped) z = 3.0;
     v_col = (u_color.a > 0.0) ? u_color : vec4(a_aux, 1.0);
     v_view = v;
+    v_world = p;
+    // A soft point's half-maximum spans the size asked for, as wide as a
+    // hard one looks: exp(-4 r^2) halves at r = 0.42 of the sprite's radius.
+    gl_PointSize = u_pradius > 0.0
+        ? clamp(u_pradius * u_s.x * u_vp.x / dist, 1.0, 256.0)
+        : u_points == 3 ? min(u_psize * 2.4, 256.0) : u_psize;
+    gl_PointSize = clamp(gl_PointSize * fxs, 1.0, 256.0);
     // Whole-segment equirect seam kill (see the comment above kProj). Both
     // vertices of a segment compute the same flag, so it interpolates flat.
     v_kill = 0.0;
@@ -103,17 +181,49 @@ void main() {
 const char* kFragMain = R"(
 in vec4 v_col;
 in vec3 v_view;
+in vec3 v_world;
 in float v_kill;
+in float v_fxa;
+in float v_fxr;
 uniform vec2 u_vp;
+uniform vec2 u_zrange;
+uniform int u_points;       // drawing the cloud: 0 square, 1 circle, 2 gaussian, 3 sphere
+uniform float u_pradius;
 out vec4 frag;
 void main() {
+    // Written on every path, or the paths that do not write it get an
+    // undefined depth once the sphere below writes it.
+    gl_FragDepth = gl_FragCoord.z;
     if (v_kill > 0.5) discard;
+    if (u_points > 0) {
+        vec2 c = gl_PointCoord * 2.0 - 1.0;
+        float r2 = dot(c, c);
+        int shape = u_points - 1;
+        if (shape != 0 && r2 > 1.0) discard;
+        // A transition's opacity: a soft point fades, a hard one is there
+        // or not, each at its own moment.
+        if (v_fxa <= 0.0 || (shape != 2 && v_fxa < v_fxr)) discard;
+        vec3 col = clip_colour(v_col.rgb, v_world);
+        if (shape == 2) {
+            // Premultiplied, for the blend the cloud is drawn with.
+            float a = exp(-4.0 * r2) * v_fxa;
+            frag = vec4(col * a, a);
+        } else if (shape == 3) {
+            float nz = sqrt(max(1.0 - r2, 0.0));
+            frag = vec4(col * (0.3 + 0.7 * nz), 1.0);
+            gl_FragDepth = gl_FragCoord.z -
+                0.5 * u_pradius * nz / (u_zrange.y - u_zrange.x);
+        } else {
+            frag = vec4(col, 1.0);
+        }
+        return;
+    }
     bool clipped;
     vec2 ndc = project_ndc(v_view, clipped);
     vec2 px = (0.5 * ndc + 0.5) * u_vp;
     if (clipped ||
         length(px - gl_FragCoord.xy) > 0.05 * min(u_vp.x, u_vp.y)) discard;
-    frag = vec4(v_col.rgb, 1.0);
+    frag = vec4(clip_colour(v_col.rgb, v_world), 1.0);
 }
 )";
 
@@ -139,15 +249,26 @@ out vec3 v_nrm;
 out vec3 v_col;
 out vec2 v_uv;
 out vec3 v_view;
+out vec3 v_world;
+out float v_fxa;
 void main() {
-    vec3 v = (u_view * vec4(a_pos, 1.0)).xyz;
+    vec3 pos = a_pos;
+    v_fxa = 1.0;
+    if (u_fx != 0) {
+        float s = 3.0 / u_fx_radius, fs;
+        vec3 dd;
+        fx_apply(a_pos, fx_noise(a_pos * s), fx_noise(a_pos * s + 17.3), dd, v_fxa, fs);
+        pos += dd;
+    }
+    vec3 v = (u_view * vec4(pos, 1.0)).xyz;
     float dist = max(length(v), 1e-9);
     float z = (dist - u_zrange.x) / (u_zrange.y - u_zrange.x) * 2.0 - 1.0;
     v_nrm = mat3(u_view) * a_nrm;
     v_col = a_col;
     v_uv = a_uv;
     v_view = v;
-    if (u_model == 0) {
+    v_world = a_pos;
+    if (u_model == 0 && u_tier == 0) {
         // PINHOLE: emit a REAL clip-space position (w = -z_view) so the
         // hardware clips triangles at the near plane. Writing NDC with w = 1
         // (which is what the point/line program does, and what this used to
@@ -172,6 +293,8 @@ in vec3 v_nrm;
 in vec3 v_col;
 in vec2 v_uv;
 in vec3 v_view;
+in vec3 v_world;
+in float v_fxa;
 uniform vec2 u_vp;
 uniform int u_mode;          // 0 flat, 1 vertex color, 2 texture
 uniform int u_color_on;      // show vertex/texture color
@@ -180,7 +303,10 @@ uniform int u_flat;          // face normals instead of interpolated ones
 uniform sampler2D u_tex;
 out vec4 frag;
 void main() {
-    if (u_model != 0) {
+    // A transition fading a mesh drops it grain by grain, a grain being a
+    // cell of the surface where it rests.
+    if (u_fx != 0 && v_fxa < fx_h3(floor(v_world * (60.0 / u_fx_radius)))) discard;
+    if (u_model != 0 || u_tier != 0) {
         // Reject fragments of a triangle that crosses a projection
         // discontinuity (the equirect +-180-degree seam, the fisheye backward
         // point). Two tests, because either alone leaves artifacts:
@@ -216,7 +342,7 @@ void main() {
         vec3 l = normalize(-v_view);
         shade = 0.25 + 0.75 * abs(dot(n, l));
     }
-    frag = vec4(base * shade, 1.0);
+    frag = vec4(clip_colour(base * shade, v_world), 1.0);
 }
 )";
 
@@ -263,135 +389,23 @@ void fill_line_deltas(std::vector<VL>& v, bool delta_from_aux) {
 }
 
 // ---- camera-frustum template --------------------------------------------
-// Port of viewer/js/dataset.js frustumTemplate / generateRay (itself a port
-// of fill_frustum_segments_kernel + projection_utils.cuh), so distorted and
-// >180-degree fisheye cameras draw as the same dome wireframes as the web
-// viewer and the engine training viewer -- NOT as tan-based pinhole
-// pyramids, which explode for wide fisheyes.
+// data/FrustumTemplate.h, the web viewer's shape: distorted and >180-degree
+// fisheye cameras draw as domes, not as tan-based pyramids.
 
-constexpr int kNSeg = 16;   // segments per image edge (Visualizer.cu:93)
-constexpr int kASeg = 4;    // subdivisions per apex anchor line
-
-enum { M_PINHOLE = 0, M_FISHEYE = 1, M_EQUISOLID = 2, M_EQUIRECT = 3 };
-
-constexpr double kPi = 3.14159265358979323846;   // MSVC has no M_PI by default
-
-struct P3 { float x, y, z; };
-
-using camhost::generate_ray;
-
-struct FrustumLine { std::vector<P3> pts; bool closed; bool dim; };
-struct FrustumTemplate { std::vector<FrustumLine> lines; std::vector<P3> anchors; };
-
-// Camera-space size-1 frustum wireframe (CV convention). Pinhole keeps the
-// classic image-border pyramid; wide models additionally get image-aligned
-// interior gridlines (wire dome); equirectangular gets a lat/long wire
-// globe over the pixel grid. See viewer/js/dataset.js frustumTemplate for
-// the full rationale.
-FrustumTemplate frustum_template(int model, int tier, int w, int h, float fx, float fy,
-                                 float cx, float cy, const float* dist) {
-    FrustumTemplate out;
-    if (w < 1) w = std::max(1, (int)std::lround(2*cx));
-    if (h < 1) h = std::max(1, (int)std::lround(2*cy));
-    // Depth-placement scale factors (Visualizer.cu:123-127) at size = 1.
-    double a = std::sqrt((double)fx*fy/((double)w*h));
-    double rs = 1/std::sqrt(a);
-    double sxy = a*rs, sz = 1/rs;      // both = sqrt(a); kept general
-    bool wide = (model == M_FISHEYE || model == M_EQUISOLID || model == M_EQUIRECT);
-    double shell = std::sqrt((2*sxy*sxy + sz*sz)/3);
-    auto place = [&](const double dir[3]) -> P3 {
-        if (wide) return {(float)(dir[0]*shell), (float)(dir[1]*shell),
-                          (float)(dir[2]*shell)};
-        if (std::fabs(dir[2]) < 1e-6) return {0, 0, 0};
-        return {(float)(dir[0]*sxy/dir[2]), (float)(dir[1]*sxy/dir[2]), (float)sz};
-    };
-    // Unproject; outside the valid domain, shrink uv toward the principal
-    // point until it re-enters (Visualizer.cu:146-157).
-    auto ray = [&](double u, double v, double dir[3]) {
-        if (generate_ray(u, v, model, tier, dist, dir)) return;
-        double t0 = 0, t1 = 1, best[3] = {0, 0, 1};
-        bool have = false;
-        for (int k = 0; k < 12; k++) {
-            double s = 0.5*(t0+t1), rr[3];
-            if (generate_ray(u*s, v*s, model, tier, dist, rr)) {
-                t0 = s; best[0]=rr[0]; best[1]=rr[1]; best[2]=rr[2]; have = true;
-            } else t1 = s;
-        }
-        (void)have;
-        dir[0] = best[0]; dir[1] = best[1]; dir[2] = best[2];
-    };
-    auto sample = [&](double x0, double y0, double x1, double y1, int n) {
-        std::vector<P3> pts;
-        pts.reserve(n + 1);
-        for (int i = 0; i <= n; i++) {
-            double t = (double)i/n;
-            double u = (x0 + (x1-x0)*t - cx)/fx, v = (y0 + (y1-y0)*t - cy)/fy;
-            double dir[3];
-            ray(u, v, dir);
-            pts.push_back(place(dir));
-        }
-        return pts;
-    };
-    auto degenerate = [&](const std::vector<P3>& pts) {
-        const P3& p0 = pts[0];
-        for (const P3& p : pts)
-            if (std::sqrt((p.x-p0.x)*(p.x-p0.x) + (p.y-p0.y)*(p.y-p0.y) +
-                          (p.z-p0.z)*(p.z-p0.z)) >= 1e-5*shell + 1e-12)
-                return false;
-        return true;
-    };
-    auto center_dir = [&]() {
-        double dir[3];
-        ray((w/2.0-cx)/fx, (h/2.0-cy)/fy, dir);
-        return place(dir);
-    };
-
-    if (model == M_EQUIRECT) {
-        // Lat/long wire globe (the i=0/4, j=0/4 lines ARE the image border);
-        // center meridian + parallel bright as the view-direction cue.
-        for (int i = 0; i <= 4; i++) {
-            auto mer = sample(w*i/4.0, 0, w*i/4.0, h, 2*kNSeg);
-            if (!degenerate(mer)) out.lines.push_back({std::move(mer), false, i != 2});
-            auto par = sample(0, h*i/4.0, w, h*i/4.0, 2*kNSeg);
-            if (!degenerate(par)) out.lines.push_back({std::move(par), false, i != 2});
-        }
-        out.anchors.push_back(center_dir());
-    } else {
-        // image-border loop (corners at indices 0, kNSeg, 2*kNSeg, 3*kNSeg)
-        double corners[4][2] = {{0,0}, {(double)w,0}, {(double)w,(double)h}, {0,(double)h}};
-        std::vector<P3> border;
-        for (int e = 0; e < 4; e++) {
-            auto edge = sample(corners[e][0], corners[e][1],
-                               corners[(e+1)%4][0], corners[(e+1)%4][1], kNSeg);
-            border.insert(border.end(), edge.begin(), edge.begin() + kNSeg);
-        }
-        P3 corner_pts[4] = {border[0], border[kNSeg], border[2*kNSeg], border[3*kNSeg]};
-        out.lines.push_back({std::move(border), true, false});
-        if (wide) {
-            for (int i = 1; i <= 3; i++) {   // interior gridlines -> wire dome
-                out.lines.push_back({sample(w*i/4.0, 0, w*i/4.0, h, 2*kNSeg), false, true});
-                out.lines.push_back({sample(0, h*i/4.0, w, h*i/4.0, 2*kNSeg), false, true});
-            }
-        }
-        // Apex->corner anchors only when the corners are in front (classic
-        // pyramid); wider cameras get a single apex->view-direction anchor.
-        bool front = true;
-        for (const P3& p : corner_pts) front = front && p.z > 0;
-        if (!wide || front)
-            out.anchors.assign(corner_pts, corner_pts + 4);
-        else
-            out.anchors.push_back(center_dir());
-    }
-    return out;
-}
+using P3 = camhost::FrustumPoint;
+using FrustumTemplate = camhost::FrustumShape;
+using camhost::FrustumLine;
+using camhost::frustum_template;
+constexpr int kASeg = camhost::kFrustumAnchorSeg;
+constexpr int M_PINHOLE = 0;
 
 }  // namespace
 
 bool PreviewRenderer::ensure_program() {
     if (_prog) return true;
     if (!glx::init()) return false;
-    std::string vs_src = std::string("#version 150\n") + kProj + kVertMain;
-    std::string fs_src = std::string("#version 150\n") + kProj + kFragMain;
+    std::string vs_src = std::string("#version 150\n") + kProj + render::fx_glsl() + kVertMain;
+    std::string fs_src = std::string("#version 150\n") + kProj + kClip + kFragMain;
     GLuint vs = compile(GL_VERTEX_SHADER, vs_src.c_str());
     GLuint fs = compile(GL_FRAGMENT_SHADER, fs_src.c_str());
     if (!vs || !fs) return false;
@@ -422,14 +436,51 @@ bool PreviewRenderer::ensure_program() {
     _u_s = glx::GetUniformLocation(_prog, "u_s");
     _u_zrange = glx::GetUniformLocation(_prog, "u_zrange");
     _u_vp = glx::GetUniformLocation(_prog, "u_vp");
+    _u_points = glx::GetUniformLocation(_prog, "u_points");
+    _u_psize = glx::GetUniformLocation(_prog, "u_psize");
+    _u_pradius = glx::GetUniformLocation(_prog, "u_pradius");
+    style_locations(0, _prog);
     return true;
+}
+
+void PreviewRenderer::style_locations(int program, unsigned prog) {
+    StyleLoc& l = _sloc[program];
+    auto at = [&](const char* name) { return glx::GetUniformLocation(prog, name); };
+    l = {at("u_tier"), at("u_dist"), at("u_clip_on"), at("u_clip"), at("u_glow"),
+         at("u_glow_col"), at("u_fx"), at("u_fx_in"), at("u_fx_t"), at("u_fx_p"), at("u_fx_c"),
+         at("u_fx_up"), at("u_fx_e1"), at("u_fx_e2"), at("u_fx_radius"), at("u_fx_qh"),
+         at("u_fx_qa"), at("u_fx_qr")};
+}
+
+void PreviewRenderer::set_style_uniforms(int program, const PreviewStyle& st) {
+    const StyleLoc& l = _sloc[program];
+    glx::Uniform1i(l.tier, st.tier);
+    glx::Uniform1fv(l.dist, 8, st.dist);
+    glx::Uniform1i(l.clip_on, st.clip ? 1 : 0);
+    glx::Uniform4f(l.clip, st.plane[0], st.plane[1], st.plane[2], st.plane[3]);
+    glx::Uniform1f(l.glow, st.glow);
+    glx::Uniform3f(l.glow_col, st.glow_col[0], st.glow_col[1], st.glow_col[2]);
+    const render::FxGeo& g = st.fx_geo;
+    glx::Uniform1i(l.fx, st.fx);
+    glx::Uniform1i(l.fx_in, st.fx_in ? 1 : 0);
+    glx::Uniform1f(l.fx_t, st.fx_t);
+    glx::Uniform2f(l.fx_p, st.fx_p[0], st.fx_p[1]);
+    glx::Uniform3f(l.fx_c, g.c[0], g.c[1], g.c[2]);
+    glx::Uniform3f(l.fx_up, g.up[0], g.up[1], g.up[2]);
+    glx::Uniform3f(l.fx_e1, g.e1[0], g.e1[1], g.e1[2]);
+    glx::Uniform3f(l.fx_e2, g.e2[0], g.e2[1], g.e2[2]);
+    glx::Uniform1f(l.fx_radius, std::max(g.radius, 1e-6f));
+    glx::Uniform1fv(l.fx_qh, render::kFxQuantiles, g.qh);
+    glx::Uniform1fv(l.fx_qa, render::kFxQuantiles, g.qa);
+    glx::Uniform1fv(l.fx_qr, render::kFxQuantiles, g.qr);
 }
 
 bool PreviewRenderer::ensure_mesh_program() {
     if (_mprog) return true;
     if (!glx::init()) return false;
-    std::string vs_src = std::string("#version 150\n") + kProj + kMeshVert;
-    std::string fs_src = std::string("#version 150\n") + kProj + kMeshFrag;
+    std::string vs_src = std::string("#version 150\n") + kProj + render::fx_glsl() + kMeshVert;
+    std::string fs_src = std::string("#version 150\n") + kProj + kClip + render::fx_glsl() +
+                         kMeshFrag;
     GLuint vs = compile(GL_VERTEX_SHADER, vs_src.c_str());
     GLuint fs = compile(GL_FRAGMENT_SHADER, fs_src.c_str());
     if (!vs || !fs) return false;
@@ -463,6 +514,7 @@ bool PreviewRenderer::ensure_mesh_program() {
     _mu_color_on = glx::GetUniformLocation(_mprog, "u_color_on");
     _mu_shade = glx::GetUniformLocation(_mprog, "u_shade");
     _mu_flat = glx::GetUniformLocation(_mprog, "u_flat");
+    style_locations(1, _mprog);
     return true;
 }
 
@@ -579,7 +631,9 @@ bool PreviewRenderer::build(const spirula::TrainerSession& session) {
 bool PreviewRenderer::build(const meshing::MeshData& mesh,
                             const float to_normalized[12]) {
     destroy_gl();
-    if (!ensure_mesh_program()) return false;
+    // Both programs: the mesh has its own, but the grid and the axes draw
+    // with the line program like everything else.
+    if (!ensure_mesh_program() || !ensure_program()) return false;
     if (mesh.V.empty() || mesh.F.empty()) return false;
 
     // The similarity into the navigated frame, or identity. Same 3x4
@@ -706,7 +760,8 @@ bool PreviewRenderer::build(const meshing::MeshData& mesh,
     return true;
 }
 
-bool PreviewRenderer::build(const ParsedDataset& ds, const PostSplitCameras& post) {
+bool PreviewRenderer::build(const ParsedDataset& ds, const PostSplitCameras& post,
+                            const uint8_t* cam_selected) {
     destroy_gl();
     if (!ensure_program()) return false;
 
@@ -763,9 +818,10 @@ bool PreviewRenderer::build(const ParsedDataset& ds, const PostSplitCameras& pos
     // distinct intrinsics), rotated into the normalized frame. Bright verts
     // (border + anchors) first, dim interior gridlines after, so render()
     // can draw the two ranges with different colors.
-    std::vector<VL> bright, dim;
+    std::vector<VL> hot, bright, dim;
     std::unordered_map<std::string, FrustumTemplate> templates;
     for (int64_t i = 0; i < ds.num_cameras; i++) {
+        const bool selected = cam_selected && cam_selected[i];
         const float* M = &ds.c2w[i*12];
         float c[3];
         float t[3] = {M[3], M[7], M[11]};
@@ -810,7 +866,7 @@ bool PreviewRenderer::build(const ParsedDataset& ds, const PostSplitCameras& pos
             out.push_back(v);
         };
         for (const FrustumLine& line : tmpl.lines) {
-            std::vector<VL>& out = line.dim ? dim : bright;
+            std::vector<VL>& out = selected ? hot : (line.dim ? dim : bright);
             size_t n = line.pts.size();
             for (size_t j = 0; j + 1 < n; j++) {
                 emit(out, line.pts[j]);
@@ -824,14 +880,17 @@ bool PreviewRenderer::build(const ParsedDataset& ds, const PostSplitCameras& pos
         // Anchor lines: apex -> corner / view direction, subdivided so they
         // curve correctly under nonlinear display projections.
         for (const P3& p : tmpl.anchors) {
+            std::vector<VL>& out = selected ? hot : bright;
             for (int j = 0; j < kASeg; j++) {
-                emit(bright, {p.x*j/kASeg, p.y*j/kASeg, p.z*j/kASeg});
-                emit(bright, {p.x*(j+1)/kASeg, p.y*(j+1)/kASeg, p.z*(j+1)/kASeg});
+                emit(out, {p.x*j/kASeg, p.y*j/kASeg, p.z*j/kASeg});
+                emit(out, {p.x*(j+1)/kASeg, p.y*(j+1)/kASeg, p.z*(j+1)/kASeg});
             }
         }
     }
+    _num_cam_sel = (int64_t)hot.size();
     _num_cam_bright = (int64_t)bright.size();
-    std::vector<VL> cams = std::move(bright);
+    std::vector<VL> cams = std::move(hot);
+    cams.insert(cams.end(), bright.begin(), bright.end());
     cams.insert(cams.end(), dim.begin(), dim.end());
     _num_cam_verts = (int64_t)cams.size();
     fill_line_deltas(cams, /*delta_from_aux=*/true);
@@ -933,17 +992,27 @@ unsigned PreviewRenderer::render(int W, int H, const float view[16],
                                  PreviewProjection proj, float sx, float sy,
                                  float scene_radius, float view_dist,
                                  const float view_target[3], bool show_cams,
-                                 float frustum_scale, bool show_grid) {
+                                 float frustum_scale, bool show_grid,
+                                 float ortho_back, const PreviewStyle* style) {
     if (!_built || !_gl_ok || W < 1 || H < 1) return 0;
     if (!ensure_fbo(W, H)) return 0;
+    static const PreviewStyle kViewport;
+    const PreviewStyle& st = style ? *style : kViewport;
     if (show_grid) ensure_grid(scene_radius, view_dist, view_target);
 
-    float zn = std::max(1e-5f, 0.002f * scene_radius);
-    float zf = std::max(10.0f * zn, 500.0f * scene_radius);
+    // Depth is LINEAR over this range, so a near plane costs no precision;
+    // what it must do is hold a camera that a placement moved a long way off.
+    float zn = std::max(1e-7f, 0.002f * std::min(scene_radius, view_dist));
+    float zf = std::max({10.0f * zn, 500.0f * scene_radius, 20.0f * view_dist});
+    if (ortho_back > 0.0f) {
+        zn = std::max(zn, ortho_back - zf);
+        zf = ortho_back + zf;
+    }
 
     glx::BindFramebuffer(GL_FRAMEBUFFER, (GLuint)_fbo);
     glViewport(0, 0, W, H);
-    glClearColor(0.05f, 0.055f, 0.065f, 1.0f);
+    if (st.transparent) glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    else glClearColor(0.05f, 0.055f, 0.065f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -961,6 +1030,7 @@ unsigned PreviewRenderer::render(int W, int H, const float view[16],
         glx::Uniform1i(_mu_color_on, _mesh_color_on ? 1 : 0);
         glx::Uniform1i(_mu_shade, _mesh_shade ? 1 : 0);
         glx::Uniform1i(_mu_flat, _mesh_flat ? 1 : 0);
+        set_style_uniforms(1, st);
         if (_mesh_mode == 2 && _mesh_color_on && _tex_mesh) {
             glx::ActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, (GLuint)_tex_mesh);
@@ -980,6 +1050,10 @@ unsigned PreviewRenderer::render(int W, int H, const float view[16],
     glx::Uniform2f(_u_s, sx, sy);
     glx::Uniform2f(_u_zrange, zn, zf);
     glx::Uniform2f(_u_vp, (float)W, (float)H);
+    set_style_uniforms(0, st);
+    glx::Uniform1i(_u_points, 0);
+    glx::Uniform1f(_u_psize, 1.0f);
+    glx::Uniform1f(_u_pradius, 0.0f);
 
     // Grid + axes (aux = vertex color; depth-tested like everything else;
     // a_delta in position units -> u_dscale = 1).
@@ -992,12 +1066,30 @@ unsigned PreviewRenderer::render(int W, int H, const float view[16],
     }
 
     // Point cloud (aux = vertex color; a_delta disabled -> seam kill no-op).
-    glPointSize(2.0f);
+    // A soft point is blended rather than depth-written: splats of it
+    // overlap, and a hard edge from the depth test is what it is avoiding.
+    const bool soft = st.point_shape == 2;
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glx::Uniform1i(_u_points, st.point_shape + 1);
+    glx::Uniform1f(_u_psize, std::max(st.point_px, 1.0f));
+    glx::Uniform1f(_u_pradius, st.point_shape == 3 ? st.point_radius : 0.0f);
+    if (soft) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+    }
     glx::Uniform1f(_u_scale, 0.0f);
     glx::Uniform1f(_u_dscale, 0.0f);
     glx::Uniform4f(_u_color, 0, 0, 0, 0);
     glx::BindVertexArray(_vao_pts);
     glDrawArrays(GL_POINTS, 0, (GLsizei)_num_points);
+    if (soft) {
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+    }
+    glDisable(GL_PROGRAM_POINT_SIZE);
+    glx::Uniform1i(_u_points, 0);
+    glx::Uniform1f(_u_pradius, 0.0f);
 
     // Camera frusta (aux = offset): bright border/anchor range, then the
     // dimmed interior gridlines of wide (dome/globe) cameras. a_delta is in
@@ -1007,12 +1099,19 @@ unsigned PreviewRenderer::render(int W, int H, const float view[16],
         glx::Uniform1f(_u_scale, fs);
         glx::Uniform1f(_u_dscale, fs);
         glx::BindVertexArray(_vao_cam);
+        // Selected first, in a colour the frusta are not already drawn in:
+        // theirs is orange, which is what a selected POINT is tinted.
+        if (_num_cam_sel > 0) {
+            glx::Uniform4f(_u_color, 0.25f, 0.92f, 1.0f, 1.0f);
+            glDrawArrays(GL_LINES, 0, (GLsizei)_num_cam_sel);
+        }
         glx::Uniform4f(_u_color, 1.0f, 0.62f, 0.25f, 1.0f);
-        glDrawArrays(GL_LINES, 0, (GLsizei)_num_cam_bright);
-        if (_num_cam_verts > _num_cam_bright) {
+        glDrawArrays(GL_LINES, (GLint)_num_cam_sel, (GLsizei)_num_cam_bright);
+        const int64_t rest = _num_cam_verts - _num_cam_sel - _num_cam_bright;
+        if (rest > 0) {
             glx::Uniform4f(_u_color, 0.5f, 0.31f, 0.125f, 1.0f);
-            glDrawArrays(GL_LINES, (GLint)_num_cam_bright,
-                         (GLsizei)(_num_cam_verts - _num_cam_bright));
+            glDrawArrays(GL_LINES, (GLint)(_num_cam_sel + _num_cam_bright),
+                         (GLsizei)rest);
         }
     }
 
@@ -1064,7 +1163,7 @@ void PreviewRenderer::destroy_gl() {
         _fbo_w = _fbo_h = 0;
     }
     _built = false;
-    _num_points = _num_cam_verts = 0;
+    _num_points = _num_cam_verts = _num_cam_sel = _num_cam_bright = 0;
 }
 
 }  // namespace gui

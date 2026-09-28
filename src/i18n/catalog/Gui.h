@@ -576,37 +576,38 @@ SS_MSG(home_new_dataset_help,
        "açılır."));
 
 SS_MSG(home_drop_hint,
-    EN("...or drop a dataset folder, photo folders, video files, or a model or "
-       "mesh file anywhere in this window"),
+    EN("...or drop a dataset folder, photo folders, video files, a model or "
+       "mesh file, or a camera project anywhere in this window"),
     JA("…または、データセットフォルダ・写真フォルダ・動画ファイル・モデルや"
-       "メッシュのファイルをこのウィンドウのどこかにドロップしてください"),
-    ZH_HANS("…或者把数据集文件夹、照片文件夹、视频文件，或者模型和网格文件拖到"
-            "这个窗口的任意位置"),
-    ZH_HANT("…或者把資料集資料夾、相片資料夾、影片檔，或者模型和網格檔案拖到"
-            "這個視窗的任意位置"),
-    KO("…또는 데이터셋 폴더, 사진 폴더, 동영상 파일, 모델이나 메시 파일을 이 창 "
-       "아무 곳에나 끌어다 놓으세요"),
-    DE("… oder ziehen Sie einen Datensatzordner, Fotoordner, Videodateien oder "
-       "eine Modell- oder Netzdatei irgendwo in dieses Fenster"),
+       "メッシュのファイル・カメラプロジェクトをこのウィンドウのどこかにドロップ"
+       "してください"),
+    ZH_HANS("…或者把数据集文件夹、照片文件夹、视频文件、模型和网格文件，或者相机"
+            "项目拖到这个窗口的任意位置"),
+    ZH_HANT("…或者把資料集資料夾、相片資料夾、影片檔、模型和網格檔案，或者相機"
+            "專案拖到這個視窗的任意位置"),
+    KO("…또는 데이터셋 폴더, 사진 폴더, 동영상 파일, 모델이나 메시 파일, 카메라 "
+       "프로젝트를 이 창 아무 곳에나 끌어다 놓으세요"),
+    DE("… oder ziehen Sie einen Datensatzordner, Fotoordner, Videodateien, eine "
+       "Modell- oder Netzdatei oder ein Kameraprojekt irgendwo in dieses Fenster"),
     FR("… ou déposez un dossier de jeu de données, des dossiers de photos, des "
-       "fichiers vidéo, ou un fichier de modèle ou de maillage n'importe où "
-       "dans cette fenêtre"),
+       "fichiers vidéo, un fichier de modèle ou de maillage, ou un projet de "
+       "caméra n'importe où dans cette fenêtre"),
     ES("… o arrastre una carpeta de conjunto de datos, carpetas de fotos, "
-       "archivos de vídeo, o un archivo de modelo o de malla a cualquier punto "
-       "de esta ventana"),
+       "archivos de vídeo, un archivo de modelo o de malla, o un proyecto de "
+       "cámara a cualquier punto de esta ventana"),
     PT("… ou arraste uma pasta de conjunto de dados, pastas de fotos, arquivos "
-       "de vídeo, ou um arquivo de modelo ou de malha para qualquer ponto "
-       "desta janela"),
+       "de vídeo, um arquivo de modelo ou de malha, ou um projeto de câmera "
+       "para qualquer ponto desta janela"),
     IT("… oppure trascina una cartella di dataset, cartelle di foto, file video, "
-       "o un file di modello o di mesh in un punto qualsiasi di questa "
-       "finestra"),
-    NL("… of sleep een datasetmap, fotomappen, videobestanden, of een model- of "
-       "meshbestand ergens in dit venster"),
+       "un file di modello o di mesh, o un progetto di camera in un punto "
+       "qualsiasi di questa finestra"),
+    NL("… of sleep een datasetmap, fotomappen, videobestanden, een model- of "
+       "meshbestand, of een cameraproject ergens in dit venster"),
     RU("…или перетащите папку набора данных, папки с фотографиями, видеофайлы, "
-       "либо файл модели или меша в любое место этого окна"),
+       "файл модели или меша либо проект камеры в любое место этого окна"),
     TR("…ya da bir veri kümesi klasörünü, fotoğraf klasörlerini, video "
-       "dosyalarını veya bir model ya da ağ dosyasını bu pencerenin herhangi "
-       "bir yerine bırakın"));
+       "dosyalarını, bir model ya da ağ dosyasını veya bir kamera projesini bu "
+       "pencerenin herhangi bir yerine bırakın"));
 
 SS_MSG(home_recent,
     EN("Recent"),        JA("最近使った項目"), ZH_HANS("最近"),   ZH_HANT("最近"),
@@ -3495,6 +3496,33 @@ SS_MSG(fd_select_files,
     RU("Выбрать файлы ({0})"),
     TR("Dosyaları seç ({0})"));
 
+SS_MSG(fd_save_here,
+    EN("Save"),          JA("保存"),          ZH_HANS("保存"),     ZH_HANT("儲存"),
+    KO("저장"),           DE("Speichern"),    FR("Enregistrer"),
+    ES("Guardar"),       PT("Salvar"),        IT("Salva"),
+    NL("Opslaan"),       RU("Сохранить"),     TR("Kaydet"));
+
+SS_MSG(fd_file_name,
+    EN("File name"),     JA("ファイル名"),     ZH_HANS("文件名"),   ZH_HANT("檔案名稱"),
+    KO("파일 이름"),      DE("Dateiname"),    FR("Nom du fichier"),
+    ES("Nombre del archivo"), PT("Nome do arquivo"), IT("Nome del file"),
+    NL("Bestandsnaam"),  RU("Имя файла"),     TR("Dosya adı"));
+
+SS_MSG(fd_will_replace,
+    EN("A file of that name is there and will be replaced."),
+    JA("同じ名前のファイルがあり、置き換えられます。"),
+    ZH_HANS("同名文件已存在，将被替换。"),
+    ZH_HANT("同名檔案已存在，將被取代。"),
+    KO("같은 이름의 파일이 있어 덮어씁니다."),
+    DE("Eine Datei dieses Namens ist vorhanden und wird ersetzt."),
+    FR("Un fichier de ce nom existe et sera remplacé."),
+    ES("Ya hay un archivo con ese nombre y será reemplazado."),
+    PT("Já existe um arquivo com esse nome e ele será substituído."),
+    IT("Esiste già un file con quel nome e verrà sostituito."),
+    NL("Er is al een bestand met die naam; het wordt vervangen."),
+    RU("Файл с таким именем есть и будет заменён."),
+    TR("Bu adda bir dosya var ve değiştirilecek."));
+
 SS_MSG(fd_multi_hint,
     EN("(click several to add them all)"),
     JA("（複数クリックするとまとめて追加できます）"),
@@ -3536,56 +3564,57 @@ SS_MSG(menu_open_splat,
     TR("Splat dosyası aç…"));
 
 SS_MSG(home_open_splat,
-    EN("View a Trained Model"),
-    JA("学習済みモデルを見る"),
-    ZH_HANS("查看已训练的模型"),
-    ZH_HANT("檢視已訓練的模型"),
-    KO("학습된 모델 보기"),
-    DE("Trainiertes Modell ansehen"),
-    FR("Voir un modèle entraîné"),
-    ES("Ver un modelo entrenado"),
-    PT("Ver um modelo treinado"),
-    IT("Guarda un modello addestrato"),
-    NL("Een getraind model bekijken"),
-    RU("Посмотреть обученную модель"),
-    TR("Eğitilmiş bir modeli görüntüle"));
+    EN("Open a Model or Reconstruction"),
+    JA("モデルまたは再構成を開く"),
+    ZH_HANS("打开模型或重建"),
+    ZH_HANT("開啟模型或重建"),
+    KO("모델 또는 복원 열기"),
+    DE("Modell oder Rekonstruktion öffnen"),
+    FR("Ouvrir un modèle ou une reconstruction"),
+    ES("Abrir un modelo o una reconstrucción"),
+    PT("Abrir um modelo ou uma reconstrução"),
+    IT("Apri un modello o una ricostruzione"),
+    NL("Een model of reconstructie openen"),
+    RU("Открыть модель или реконструкцию"),
+    TR("Bir model veya yeniden yapım aç"));
 
 SS_MSG(home_open_splat_help,
-    EN("Open a .ply file, a checkpoint or a run folder and look around it. "
-       "Models from other Gaussian splatting tools open too, and so does a "
-       "plain point cloud."),
-    JA("PLYファイル・チェックポイント・実行フォルダを開いて自由に見て回れます。"
-       "他のガウススプラッティングツールのモデルや、ただの点群も開けます。"),
-    ZH_HANS("打开 .ply 文件、检查点或运行文件夹，随意观察。也可以打开其他高斯泼溅"
-            "工具的模型，以及普通点云。"),
-    ZH_HANT("開啟 .ply 檔案、檢查點或執行資料夾，隨意觀察。也可以開啟其他高斯潑濺"
-            "工具的模型，以及一般點雲。"),
-    KO(".ply 파일, 체크포인트, 실행 폴더를 열어 자유롭게 둘러봅니다. 다른 가우시안 "
-       "스플래팅 도구의 모델이나 단순한 점군도 열립니다."),
-    DE("Eine .ply-Datei, einen Prüfpunkt oder einen Laufordner öffnen und sich "
-       "darin umsehen. Modelle aus anderen Gaussian-Splatting-Werkzeugen lassen "
-       "sich ebenso öffnen wie eine reine Punktwolke."),
-    FR("Ouvrez un fichier .ply, un point de sauvegarde ou un dossier "
-       "d'exécution et promenez-vous dedans. Les modèles d'autres outils de "
-       "Gaussian splatting s'ouvrent aussi, tout comme un simple nuage de points."),
-    ES("Abra un archivo .ply, un punto de control o una carpeta de ejecución y "
-       "recórralo. También se abren modelos de otras herramientas de Gaussian "
-       "splatting y una simple nube de puntos."),
-    PT("Abra um arquivo .ply, um ponto de verificação ou uma pasta de execução "
-       "e percorra-o. Modelos de outras ferramentas de Gaussian splatting "
-       "também abrem, assim como uma simples nuvem de pontos."),
-    IT("Apra un file .ply, un punto di controllo o una cartella di esecuzione e "
-       "ci si muova dentro. Si aprono anche i modelli di altri strumenti di "
-       "Gaussian splatting e una semplice nuvola di punti."),
-    NL("Open een .ply-bestand, een checkpoint of een uitvoermap en kijk erin "
-       "rond. Modellen uit andere Gaussian-splattingprogramma's openen ook, "
-       "net als een gewone puntenwolk."),
-    RU("Откройте файл .ply, контрольную точку или папку запуска и осмотритесь. "
-       "Модели из других инструментов гауссова сплаттинга тоже открываются, как "
-       "и обычное облако точек."),
-    TR("Bir .ply dosyasını, bir kontrol noktasını veya bir çalışma klasörünü "
-       "açıp içinde gezinin. Başka Gaussian splatting araçlarının modelleri de, "
-       "sıradan bir nokta bulutu da açılır."));
+    EN("A .ply file, a checkpoint, a run folder, or a reconstruction -- its "
+       "dataset folder, or any one of the files that define it. Look around "
+       "it, and clean it up."),
+    JA("PLYファイル、チェックポイント、実行フォルダ、または再構成 -- そのデータ"
+       "セットフォルダでも、それを定めるファイルのどれか一つでも構いません。"
+       "自由に見て回り、不要なところを取り除けます。"),
+    ZH_HANS("可以是 .ply 文件、检查点、运行文件夹，或一个重建——它的数据集文件夹，"
+            "或定义它的任意一个文件。可以随意观察，也可以清理。"),
+    ZH_HANT("可以是 .ply 檔案、檢查點、執行資料夾，或一個重建——它的資料集資料夾，"
+            "或定義它的任意一個檔案。可以隨意觀察，也可以清理。"),
+    KO(".ply 파일, 체크포인트, 실행 폴더, 또는 복원 -- 그 데이터셋 폴더나 그것을 "
+       "이루는 파일 중 하나. 둘러보고 정리할 수 있습니다."),
+    DE("Eine .ply-Datei, ein Prüfpunkt, ein Laufordner oder eine Rekonstruktion "
+       "-- ihr Datensatzordner oder eine der Dateien, die sie ausmachen. Darin "
+       "umsehen und aufräumen."),
+    FR("Un fichier .ply, un point de sauvegarde, un dossier d'exécution ou une "
+       "reconstruction -- son dossier de jeu de données, ou l'un des fichiers "
+       "qui la définissent. À parcourir, et à nettoyer."),
+    ES("Un archivo .ply, un punto de control, una carpeta de ejecución o una "
+       "reconstrucción: su carpeta de datos, o cualquiera de los archivos que "
+       "la definen. Para recorrerla y para limpiarla."),
+    PT("Um arquivo .ply, um ponto de verificação, uma pasta de execução ou uma "
+       "reconstrução -- a pasta do conjunto, ou qualquer um dos arquivos que a "
+       "definem. Para percorrer e para limpar."),
+    IT("Un file .ply, un punto di controllo, una cartella di esecuzione o una "
+       "ricostruzione -- la sua cartella di dati, o uno qualsiasi dei file che "
+       "la definiscono. Da percorrere e da ripulire."),
+    NL("Een .ply-bestand, een checkpoint, een uitvoermap of een reconstructie "
+       "-- de gegevensmap ervan, of een van de bestanden die hem vormen. Om in "
+       "rond te kijken en om op te ruimen."),
+    RU("Файл .ply, контрольная точка, папка запуска или реконструкция -- её "
+       "папка набора данных или любой из файлов, которые её задают. Чтобы "
+       "осмотреться и чтобы почистить."),
+    TR("Bir .ply dosyası, bir kontrol noktası, bir çalışma klasörü ya da bir "
+       "yeniden yapım -- veri kümesi klasörü veya onu tanımlayan dosyalardan "
+       "herhangi biri. İçinde gezinmek ve temizlemek için."));
 
 SS_MSG(viewer_pick_file,
     EN("Choose a splat file, checkpoint or run folder"),
@@ -9239,6 +9268,138 @@ SS_MSG(batch_plan_mesh_run,
     NL("{0}. Mesh maken van de run getraind met {1}"),
     RU("{0}. Построить меш по прогону, обученному с {1}"),
     TR("{0}. {1} ile eğitilen çalıştırmadan ağ oluştur"));
+
+
+// ===========================================================================
+// The navigation gizmo
+// ===========================================================================
+
+SS_MSG(gizmo_help,
+    EN("Drag to orbit. Click an axis to look along it; click it again for the far side."),
+    JA("ドラッグで視点を回転します。軸をクリックするとその軸方向から見ます。もう一度クリックすると反対側からになります。"),
+    ZH_HANS("拖动以环绕视角。点击某个轴可沿该轴观察，再点一次则从另一侧观察。"),
+    ZH_HANT("拖曳以環繞視角。點選某個軸可沿該軸觀看，再點一次則從另一側觀看。"),
+    KO("드래그하면 시점이 회전합니다. 축을 클릭하면 그 축 방향에서 보고, 다시 클릭하면 반대쪽에서 봅니다."),
+    DE("Ziehen dreht die Ansicht. Ein Klick auf eine Achse blickt entlang dieser Achse, ein zweiter Klick von der Gegenseite."),
+    FR("Faites glisser pour tourner autour. Cliquez sur un axe pour regarder le long de celui-ci, et une seconde fois pour le côté opposé."),
+    ES("Arrastra para orbitar. Haz clic en un eje para mirar a lo largo de él; otro clic para el lado opuesto."),
+    PT("Arraste para orbitar. Clique em um eixo para olhar ao longo dele; clique de novo para o lado oposto."),
+    IT("Trascina per orbitare. Fai clic su un asse per guardare lungo di esso; un altro clic per il lato opposto."),
+    NL("Sleep om rond het model te draaien. Klik op een as om erlangs te kijken; klik nogmaals voor de andere kant."),
+    RU("Перетащите, чтобы вращать вид. Щёлкните по оси, чтобы смотреть вдоль неё; ещё раз — с обратной стороны."),
+    TR("Yörüngede dönmek için sürükleyin. Bir eksene tıklayınca o eksen boyunca bakılır; yeniden tıklayınca karşı taraftan."));
+
+SS_MSG(gizmo_zoom_help,
+    EN("Drag up or down to zoom."),
+    JA("上下にドラッグしてズームします。"),
+    ZH_HANS("上下拖动以缩放。"),
+    ZH_HANT("上下拖曳以縮放。"),
+    KO("위아래로 드래그해 확대·축소합니다."),
+    DE("Zum Zoomen nach oben oder unten ziehen."),
+    FR("Faites glisser vers le haut ou le bas pour zoomer."),
+    ES("Arrastra hacia arriba o abajo para acercar o alejar."),
+    PT("Arraste para cima ou para baixo para aproximar ou afastar."),
+    IT("Trascina in alto o in basso per ingrandire o ridurre."),
+    NL("Sleep omhoog of omlaag om te zoomen."),
+    RU("Перетащите вверх или вниз, чтобы приблизить или отдалить."),
+    TR("Yakınlaştırmak için yukarı ya da aşağı sürükleyin."));
+
+SS_MSG(gizmo_pan_help,
+    EN("Drag to pan."),
+    JA("ドラッグして視点を平行移動します。"),
+    ZH_HANS("拖动以平移视角。"),
+    ZH_HANT("拖曳以平移視角。"),
+    KO("드래그해 시점을 평행 이동합니다."),
+    DE("Zum Verschieben der Ansicht ziehen."),
+    FR("Faites glisser pour déplacer la vue."),
+    ES("Arrastra para desplazar la vista."),
+    PT("Arraste para deslocar a vista."),
+    IT("Trascina per spostare la vista."),
+    NL("Sleep om het beeld te verschuiven."),
+    RU("Перетащите, чтобы сдвинуть вид."),
+    TR("Görünümü kaydırmak için sürükleyin."));
+
+SS_MSG(gizmo_to_ortho,
+    EN("Switch to the orthographic view (numeric-pad 5)."),
+    JA("平行投影に切り替えます（テンキーの 5）。"),
+    ZH_HANS("切换到正交视图（数字键盘 5）。"),
+    ZH_HANT("切換到正交視圖（數字鍵盤 5）。"),
+    KO("직교 투영으로 전환합니다(숫자 패드 5)."),
+    DE("Zur orthografischen Ansicht wechseln (Ziffernblock 5)."),
+    FR("Passer à la vue orthographique (pavé numérique 5)."),
+    ES("Cambiar a la vista ortográfica (teclado numérico 5)."),
+    PT("Mudar para a vista ortográfica (teclado numérico 5)."),
+    IT("Passa alla vista ortografica (tastierino numerico 5)."),
+    NL("Overschakelen naar orthografische weergave (numeriek toetsenblok 5)."),
+    RU("Переключиться на ортографический вид (цифровая клавиатура 5)."),
+    TR("Ortografik görünüme geç (sayısal tuş takımı 5)."));
+
+SS_MSG(gizmo_to_perspective,
+    EN("Switch to the perspective view (numeric-pad 5)."),
+    JA("透視投影に切り替えます（テンキーの 5）。"),
+    ZH_HANS("切换到透视视图（数字键盘 5）。"),
+    ZH_HANT("切換到透視視圖（數字鍵盤 5）。"),
+    KO("원근 투영으로 전환합니다(숫자 패드 5)."),
+    DE("Zur perspektivischen Ansicht wechseln (Ziffernblock 5)."),
+    FR("Passer à la vue en perspective (pavé numérique 5)."),
+    ES("Cambiar a la vista en perspectiva (teclado numérico 5)."),
+    PT("Mudar para a vista em perspectiva (teclado numérico 5)."),
+    IT("Passa alla vista prospettica (tastierino numerico 5)."),
+    NL("Overschakelen naar perspectiefweergave (numeriek toetsenblok 5)."),
+    RU("Переключиться на перспективный вид (цифровая клавиатура 5)."),
+    TR("Perspektif görünüme geç (sayısal tuş takımı 5)."));
+
+
+
+// ===========================================================================
+// Saving under a name that gained its extension
+// ===========================================================================
+
+SS_MSG(fd_replace_title,
+    EN("Replace the file?"),
+    JA("ファイルを置き換えますか？"),
+    ZH_HANS("要替换文件吗？"),
+    ZH_HANT("要取代檔案嗎？"),
+    KO("파일을 바꿀까요?"),
+    DE("Datei ersetzen?"),
+    FR("Remplacer le fichier ?"),
+    ES("¿Reemplazar el archivo?"),
+    PT("Substituir o arquivo?"),
+    IT("Sostituire il file?"),
+    NL("Bestand vervangen?"),
+    RU("Заменить файл?"),
+    TR("Dosya değiştirilsin mi?"));
+
+SS_MSG(fd_replace_body,
+    EN("{0} already exists. Replace it?"),
+    JA("{0} は既に存在します。置き換えますか？"),
+    ZH_HANS("{0} 已经存在。要替换它吗？"),
+    ZH_HANT("{0} 已經存在。要取代它嗎？"),
+    KO("{0}이(가) 이미 있습니다. 바꿀까요?"),
+    DE("{0} existiert bereits. Ersetzen?"),
+    FR("{0} existe déjà. Le remplacer ?"),
+    ES("{0} ya existe. ¿Reemplazarlo?"),
+    PT("{0} já existe. Substituí-lo?"),
+    IT("{0} esiste già. Sostituirlo?"),
+    NL("{0} bestaat al. Vervangen?"),
+    RU("{0} уже существует. Заменить?"),
+    TR("{0} zaten var. Değiştirilsin mi?"));
+
+SS_MSG(fd_replace_yes,
+    EN("Replace"),
+    JA("置き換える"),
+    ZH_HANS("替换"),
+    ZH_HANT("取代"),
+    KO("바꾸기"),
+    DE("Ersetzen"),
+    FR("Remplacer"),
+    ES("Reemplazar"),
+    PT("Substituir"),
+    IT("Sostituisci"),
+    NL("Vervangen"),
+    RU("Заменить"),
+    TR("Değiştir"));
+
 
 }  // namespace gui
 }  // namespace msg
