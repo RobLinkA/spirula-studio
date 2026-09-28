@@ -10,9 +10,10 @@
 #include "mesh/MeshExport.h"   // meshing::MeshData
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
-namespace spirula { class TrainerSession; }
+namespace spirula { class TrainerSession; struct RegionOverlay; }
 
 namespace gui {
 
@@ -58,11 +59,11 @@ public:
     // context (GUI thread) and the session's load_dataset() to have
     // completed. Returns false when GL init fails (missing functions).
     bool build(const spirula::TrainerSession& session);
-    // The same over parsed data alone, with no cameras at all handled (a
-    // point file has none, and then no frusta are drawn). `cam_selected` is
-    // one flag per camera of `ds`, drawn in the highlight colour.
+    // The same over parsed data alone (a point file has no cameras, so no
+    // frusta). `cam_selected` is one flag per camera, drawn in the highlight
+    // colour; `cam_rgb`, [N,3] in 0..1, gives every camera its own colour instead.
     bool build(const ParsedDataset& ds, const PostSplitCameras& post,
-               const uint8_t* cam_selected = nullptr);
+               const uint8_t* cam_selected = nullptr, const float* cam_rgb = nullptr);
     // A triangle mesh, drawn shaded instead of a point cloud. `to_normalized`
     // is the similarity that maps the mesh's own coordinates into the frame
     // the viewport navigates (scale + center, as SplatViewer computes for a
@@ -101,6 +102,10 @@ public:
                     // along its axis (ViewportPanel::ortho_pullback), 0 if not.
                     float ortho_back = 0.0f,
                     const PreviewStyle* style = nullptr);
+
+    // A region's boundary drawn over the cloud (app/webviewer/RegionOverlay.h),
+    // in the frame the built points are in; null for none. Survives a rebuild.
+    void set_overlay(std::shared_ptr<const spirula::RegionOverlay> ov, bool visible);
 
     // Base frustum size (camhost::frustum_display_size, normalized frame).
     float base_camera_size() const { return _base_cam_size; }
@@ -170,7 +175,21 @@ private:
     int64_t _num_cam_verts = 0;
     int64_t _num_cam_sel = 0;
     int64_t _num_cam_bright = 0;
+    // With per-camera colours instead: one draw per distinct colour.
+    struct CamGroup { int64_t first, count; float rgb[3]; };
+    std::vector<CamGroup> _cam_groups;
     float _base_cam_size = 0.1f;
+
+    std::shared_ptr<const spirula::RegionOverlay> _ov, _ov_uploaded;
+    std::shared_ptr<spirula::RegionOverlay> _ov_local;   // in the normalized frame
+    bool _ov_visible = false;
+    unsigned _vao_ov = 0, _vbo_ov = 0, _vao_ovl = 0, _vbo_ovl = 0;
+    std::vector<int64_t> _ov_first;   // per layer, into the triangle buffer
+    std::vector<float> _ov_dash;      // per layer, dash period
+    int _u_alpha = -1, _u_dash = -1;
+    void upload_overlay();
+    void draw_overlay(const float view[16]);
+    void destroy_overlay_gl();
 
     unsigned _fbo = 0, _color_tex = 0, _depth_rb = 0;
     int _fbo_w = 0, _fbo_h = 0;

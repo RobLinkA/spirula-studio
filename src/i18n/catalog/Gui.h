@@ -2815,6 +2815,46 @@ SS_MSG(viewport_grid,
     PT("grade"),         IT("griglia"),      NL("raster"),       RU("сетка"),
     TR("ızgara"));
 
+SS_MSG(viewport_region,
+    EN("region"),        JA("領域"),          ZH_HANS("区域"),     ZH_HANT("區域"),
+    KO("영역"),           DE("Bereich"),      FR("région"),       ES("región"),
+    PT("região"),        IT("regione"),      NL("gebied"),       RU("область"),
+    TR("bölge"));
+
+SS_MSG(viewport_region_help,
+    EN("The region of interest this run trains, drawn as a tinted surface with a "
+       "dashed outline; fainter where the scene is in front of it. Splats outside "
+       "it are rarely densified."),
+    JA("この実行が学習する注目領域。色付きの面と破線の輪郭で描き、シーンの陰になる部分は薄く表示します。"
+       "領域外のスプラットはほとんど高密度化されません。"),
+    ZH_HANS("本次训练的感兴趣区域，以着色表面和虚线轮廓显示；被场景遮挡的部分较淡。区域外的高斯点很少被加密。"),
+    ZH_HANT("本次訓練的感興趣區域，以著色表面和虛線輪廓顯示；被場景遮擋的部分較淡。區域外的高斯點很少被加密。"),
+    KO("이 실행이 학습하는 관심 영역을 색칠된 면과 점선 윤곽으로 표시합니다. 장면에 가려진 부분은 흐리게 보입니다. "
+       "영역 밖의 스플랫은 거의 조밀화되지 않습니다."),
+    DE("Der Interessenbereich, den dieser Lauf trainiert, als getönte Fläche mit "
+       "gestrichelter Kontur; blasser, wo die Szene davor liegt. Splats außerhalb "
+       "werden kaum verdichtet."),
+    FR("La région d'intérêt que cet entraînement apprend, en surface teintée au "
+       "contour pointillé ; plus pâle là où la scène passe devant. Les splats hors "
+       "de la région sont rarement densifiés."),
+    ES("La región de interés que entrena esta ejecución, como superficie tintada con "
+       "contorno discontinuo; más tenue donde la escena queda delante. Los splats "
+       "fuera de ella apenas se densifican."),
+    PT("A região de interesse que esta execução treina, como superfície tingida com "
+       "contorno tracejado; mais clara onde a cena fica à frente. Splats fora dela "
+       "quase não são densificados."),
+    IT("La regione di interesse che questa esecuzione addestra, come superficie "
+       "colorata con contorno tratteggiato; più tenue dove la scena sta davanti. Gli "
+       "splat fuori da essa vengono densificati di rado."),
+    NL("Het interessegebied dat deze run traint, als getint oppervlak met een "
+       "gestippelde omtrek; vager waar de scène ervoor ligt. Splats erbuiten worden "
+       "zelden verdicht."),
+    RU("Область интереса этого обучения: тонированная поверхность с пунктирным "
+       "контуром, бледнее там, где сцена перед ней. Сплаты вне её почти не уплотняются."),
+    TR("Bu eğitimin ilgi bölgesi; renkli bir yüzey ve kesikli bir çerçeveyle çizilir, "
+       "sahnenin önünde kaldığı yerde daha soluktur. Dışındaki splat'ler nadiren "
+       "yoğunlaştırılır."));
+
 SS_MSG(viewport_level_cameras,
     EN("auto-level"),    JA("自動水平"),      ZH_HANS("自动摆正"),  ZH_HANT("自動擺正"),
     KO("자동 수평"),      DE("autom. Ausrichtung"), FR("mise à niveau"),
@@ -4819,6 +4859,85 @@ SS_MSG(batch_no_recent,
     NL("Er is nog geen dataset geopend."),
     RU("Ни один набор данных ещё не открывался."),
     TR("Henüz hiçbir veri kümesi açılmadı."));
+SS_MSG(batch_clear_done,
+    EN("Clear done rows"), JA("完了した行を消す"), ZH_HANS("清除已完成的行"),
+    ZH_HANT("清除已完成的列"), KO("완료된 행 지우기"), DE("Fertige Zeilen entfernen"),
+    FR("Retirer les lignes terminées"), ES("Quitar las filas terminadas"),
+    PT("Remover as linhas terminadas"), IT("Rimuovi le righe terminate"),
+    NL("Klare rijen verwijderen"), RU("Убрать завершённые строки"),
+    TR("Biten satırları temizle"));
+SS_MSG(batch_clear_done_help,
+    EN("Removes every row whose tasks all finished well in the last run of the "
+       "list. Rows that failed, were stopped or never ran stay."),
+    JA("直近の実行で全タスクが成功した行をすべて消します。失敗・停止・未実行の行は"
+       "残ります。"),
+    ZH_HANS("删除上次运行中所有任务都成功完成的行。失败、被停止或未运行的行保留。"),
+    ZH_HANT("刪除上次執行中所有任務都成功完成的列。失敗、被停止或未執行的列保留。"),
+    KO("마지막 실행에서 모든 작업이 잘 끝난 행을 모두 지웁니다. 실패했거나 중단됐"
+       "거나 실행되지 않은 행은 남습니다."),
+    DE("Entfernt jede Zeile, deren Aufgaben beim letzten Lauf der Liste alle gut "
+       "endeten. Fehlgeschlagene, gestoppte oder nie gelaufene Zeilen bleiben."),
+    FR("Retire chaque ligne dont toutes les tâches ont bien fini lors du dernier "
+       "passage. Les lignes échouées, arrêtées ou jamais lancées restent."),
+    ES("Quita cada fila cuyas tareas terminaron todas bien en la última ejecución "
+       "de la lista. Las filas fallidas, detenidas o nunca ejecutadas se quedan."),
+    PT("Remove cada linha cujas tarefas terminaram todas bem na última execução "
+       "da lista. As linhas falhadas, paradas ou nunca executadas ficam."),
+    IT("Rimuove ogni riga i cui compiti sono finiti tutti bene nell'ultima "
+       "esecuzione della lista. Le righe fallite, fermate o mai eseguite restano."),
+    NL("Verwijdert elke rij waarvan alle taken bij de laatste run goed eindigden. "
+       "Mislukte, gestopte of nooit gedraaide rijen blijven."),
+    RU("Убирает каждую строку, все задачи которой успешно завершились при "
+       "последнем прогоне списка. Неудачные, остановленные и не запускавшиеся "
+       "строки остаются."),
+    TR("Listenin son çalışmasında tüm görevleri iyi biten her satırı kaldırır. "
+       "Başarısız, durdurulmuş ya da hiç çalışmamış satırlar kalır."));
+SS_MSG(batch_confirm_title,
+    EN("Batch list"), JA("バッチ一覧"), ZH_HANS("批处理列表"), ZH_HANT("批次處理列表"),
+    KO("배치 목록"), DE("Stapelliste"), FR("Liste du lot"), ES("Lista del lote"),
+    PT("Lista do lote"), IT("Lista del lotto"), NL("Batchlijst"), RU("Пакетный список"),
+    TR("Toplu liste"));
+SS_MSG(batch_clear_confirm,
+    EN("Remove every row from the list? The saved presets and the runs already "
+       "written are not touched."),
+    JA("一覧のすべての行を消しますか？保存済みプリセットと書き出し済みの実行結果は"
+       "そのままです。"),
+    ZH_HANS("从列表中删除所有行？已保存的预设和已写出的运行结果不受影响。"),
+    ZH_HANT("從列表中刪除所有列？已儲存的預設和已寫出的執行結果不受影響。"),
+    KO("목록의 모든 행을 지울까요? 저장된 프리셋과 이미 기록된 실행 결과는 그대로입니다."),
+    DE("Alle Zeilen von der Liste entfernen? Gespeicherte Presets und bereits "
+       "geschriebene Läufe bleiben unberührt."),
+    FR("Retirer toutes les lignes de la liste ? Les préréglages enregistrés et les "
+       "entraînements déjà écrits ne sont pas touchés."),
+    ES("¿Quitar todas las filas de la lista? Los ajustes guardados y las "
+       "ejecuciones ya escritas no se tocan."),
+    PT("Remover todas as linhas da lista? As predefinições guardadas e os treinos "
+       "já escritos não são tocados."),
+    IT("Rimuovere tutte le righe dalla lista? I preset salvati e le esecuzioni "
+       "già scritte non vengono toccati."),
+    NL("Alle rijen van de lijst verwijderen? Opgeslagen presets en al weggeschreven "
+       "runs blijven onaangeroerd."),
+    RU("Убрать все строки из списка? Сохранённые пресеты и уже записанные запуски "
+       "не затрагиваются."),
+    TR("Listedeki tüm satırlar kaldırılsın mı? Kayıtlı ön ayarlar ve yazılmış "
+       "çalıştırmalar dokunulmadan kalır."));
+SS_MSG(batch_clear_done_confirm,
+    EN("Remove the rows that finished well? What they wrote stays on disk."),
+    JA("成功して終わった行を消しますか？書き出したものはディスクに残ります。"),
+    ZH_HANS("删除已成功完成的行？它们写出的内容仍保留在磁盘上。"),
+    ZH_HANT("刪除已成功完成的列？它們寫出的內容仍保留在磁碟上。"),
+    KO("잘 끝난 행을 지울까요? 그 행들이 기록한 것은 디스크에 남습니다."),
+    DE("Die gut beendeten Zeilen entfernen? Was sie geschrieben haben, bleibt auf "
+       "der Platte."),
+    FR("Retirer les lignes bien terminées ? Ce qu'elles ont écrit reste sur le "
+       "disque."),
+    ES("¿Quitar las filas que terminaron bien? Lo que escribieron sigue en el disco."),
+    PT("Remover as linhas que terminaram bem? O que escreveram fica no disco."),
+    IT("Rimuovere le righe finite bene? Ciò che hanno scritto resta su disco."),
+    NL("De goed geëindigde rijen verwijderen? Wat ze schreven blijft op schijf."),
+    RU("Убрать успешно завершённые строки? Записанное ими остаётся на диске."),
+    TR("İyi biten satırlar kaldırılsın mı? Yazdıkları diskte kalır."));
+
 SS_MSG(batch_clear,
     EN("Clear list"),
     JA("一覧を空にする"),
@@ -5686,6 +5805,21 @@ SS_MSG(chk_dataset_not_a_dir,
     NL("Dit is een bestand, geen datasetmap: {0}"),
     RU("Это файл, а не папка набора данных: {0}"),
     TR("Bu bir dosya, veri kümesi klasörü değil: {0}"));
+SS_MSG(chk_partition_missing,
+    EN("The partition file this row trains a part of is missing: {0}"),
+    JA("この行が学習するパートの分割ファイルがありません: {0}"),
+    ZH_HANS("此行要训练的分区所属的分区文件不存在：{0}"),
+    ZH_HANT("此行要訓練的分區所屬的分區檔案不存在：{0}"),
+    KO("이 행이 학습할 파트의 분할 파일이 없습니다: {0}"),
+    DE("Die Partitionsdatei, deren Teil diese Zeile trainiert, fehlt: {0}"),
+    FR("Le fichier de partition dont cette ligne entraîne une partie est absent : {0}"),
+    ES("Falta el archivo de partición del que esta fila entrena una parte: {0}"),
+    PT("Falta o ficheiro de partição de que esta linha treina uma parte: {0}"),
+    IT("Manca il file di partizione di cui questa riga addestra una parte: {0}"),
+    NL("Het partitiebestand waarvan deze rij een deel traint ontbreekt: {0}"),
+    RU("Нет файла разбиения, часть которого обучает эта строка: {0}"),
+    TR("Bu satırın bir parçasını eğittiği bölümleme dosyası yok: {0}"));
+
 SS_MSG(chk_dataset_unreadable,
     EN("This folder holds no reconstruction the trainer can read -- no "
        "transforms.json, no sparse/ or colmap/, no Metashape .xml beside a "

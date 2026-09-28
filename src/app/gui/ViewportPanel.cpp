@@ -186,13 +186,9 @@ void ViewportPanel::compute_framing(const spirula::TrainerSession& session) {
 
     // Scene radius (drives only the preview depth range): spread of the
     // camera positions in the client frame.
-    double A[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     const auto& ds = session.ds;
-    if (ds.train_frame_scale != 1.0f) {
-        double T[16];
-        for (int i = 0; i < 16; i++) T[i] = ds.train_to_normalized[i];
-        dsparse::invert_affine4x4(T, A);
-    }
+    double A[16];
+    dsparse::train_to_normalized_inverse(ds, A);
     double radius = 1.0;
     for (int64_t i = 0; i < ds.num_cameras; i++) {
         float p[3] = {ds.c2w[i*12 + 3], ds.c2w[i*12 + 7], ds.c2w[i*12 + 11]};
@@ -676,6 +672,7 @@ void ViewportPanel::build_request(ViewRequest& q, int W, int H) const {
     q.key = _buffer_keys.empty() ? "rgb" : _buffer_keys[_buffer_idx];
     q.show_cams = _show_cams;
     q.show_grid = _show_grid && !external_grid();
+    q.show_roi = _show_roi && _roi_engine != nullptr;
     q.grid_dist = nav_dist() / _m2s_scale;
     model_point(_cam.target, q.grid_target);
     q.cam_size_scale = _frustum_scale;
@@ -841,7 +838,8 @@ void ViewportPanel::attach_preview_data(const ParsedDataset& ds,
                                        const PostSplitCameras& post,
                                        const std::string& key, float radius,
                                        bool with_cameras,
-                                       const uint8_t* cam_selected) {
+                                       const uint8_t* cam_selected,
+                                       const float* cam_rgb) {
     const bool first = key != _framed_key;
     detach();
     _has_cameras = with_cameras;
@@ -849,7 +847,7 @@ void ViewportPanel::attach_preview_data(const ParsedDataset& ds,
     // watching the cameras find their places. Only on the first attach, so a
     // refresh does not undo the switch.
     if (first) _show_cams = with_cameras;
-    if (!_preview.build(ds, post, cam_selected)) {
+    if (!_preview.build(ds, post, cam_selected, cam_rgb)) {
         _last_error = "preview renderer unavailable (OpenGL 3.2 required)";
         return;
     }
@@ -914,9 +912,18 @@ void ViewportPanel::attach_preview_mesh(const meshing::MeshData& mesh,
     _mode = Mode::Preview;
 }
 
+void ViewportPanel::set_region_overlay(std::shared_ptr<const spirula::RegionOverlay> engine,
+                                       std::shared_ptr<const spirula::RegionOverlay> preview) {
+    _roi_engine = std::move(engine);
+    _roi_preview = std::move(preview);
+    if (_mode == Mode::Engine) _worker.set_region_overlay(_roi_engine);
+    _dirty = true;
+}
+
 void ViewportPanel::attach(spirula::TrainerSession& session) {
     detach();
     _worker.start(session.make_viewer_config(), session.make_viewer_hooks());
+    _worker.set_region_overlay(_roi_engine);
     _buffer_keys = _worker.buffer_keys();
     _buffer_idx = std::min<int>(_buffer_idx, (int)_buffer_keys.size() - 1);
     _has_cameras = session.ds.num_cameras > 0;
@@ -1521,6 +1528,11 @@ void ViewportPanel::draw_controls(bool engine) {
     place(check_w(msg::viewport_grid));
     if (ui::Checkbox(msg::viewport_grid, &_show_grid)) _dirty = true;
     ui::help_on_hover(msg::viewport_cameras_help);
+    if (_mode == Mode::Engine ? _roi_engine != nullptr : _roi_preview != nullptr) {
+        place(check_w(msg::viewport_region));
+        if (ui::Checkbox(msg::viewport_region, &_show_roi)) _dirty = true;
+        ui::help_on_hover(msg::viewport_region_help);
+    }
     // Only where there is a guess to switch off. Turntable and first-person
     // orbit about the navigated frame's +Z, so this is what they turn about.
     if (!_align_identity) {
@@ -1844,6 +1856,7 @@ void ViewportPanel::draw_preview(const ImVec2& avail) {
     compute_intrinsics(W, H, fx, fy);
     float target[3];
     model_point(_cam.target, target);
+    _preview.set_overlay(_roi_preview, _show_roi);
     unsigned tex = _preview.render(W, H, view,
                                    (PreviewProjection)_cam_model,
                                    fx / (0.5f * W), fy / (0.5f * H),
