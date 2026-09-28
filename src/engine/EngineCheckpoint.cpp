@@ -14,6 +14,7 @@
 
 #include "core/CheckpointIO.h"
 #include "checkpoint/SplatTransform.h"
+#include "data/SceneTransform.h"
 #include "external/npy.hpp"
 #include <cmath>
 #include <cstdint>
