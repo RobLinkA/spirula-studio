@@ -818,6 +818,7 @@ private:
     // view, built off the GUI thread; keyed by the region it was built from.
     struct RoiOverlays {
         std::shared_ptr<const spirula::RegionOverlay> engine, preview;
+        std::shared_ptr<const std::vector<uint8_t>> points_inside;
     };
     const void* _roi_key = nullptr;
     std::future<RoiOverlays> _roi_job;
@@ -826,7 +827,7 @@ private:
     // Every task of the row ran and finished well.
     bool batch_row_done(int index) const;
     // "Clear list" and "Clear done rows" both ask first.
-    enum class BatchConfirm { None, ClearList, ClearDone };
+    enum class BatchConfirm { None, ClearList, ClearDone, ClearUnchecked };
     BatchConfirm _batch_confirm = BatchConfirm::None;
     bool _batch_confirm_shown = false;
     void draw_batch_confirm_modal();

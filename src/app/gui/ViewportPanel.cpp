@@ -913,9 +913,11 @@ void ViewportPanel::attach_preview_mesh(const meshing::MeshData& mesh,
 }
 
 void ViewportPanel::set_region_overlay(std::shared_ptr<const spirula::RegionOverlay> engine,
-                                       std::shared_ptr<const spirula::RegionOverlay> preview) {
+                                       std::shared_ptr<const spirula::RegionOverlay> preview,
+                                       std::shared_ptr<const std::vector<uint8_t>> points_inside) {
     _roi_engine = std::move(engine);
     _roi_preview = std::move(preview);
+    _roi_points_inside = std::move(points_inside);
     if (_mode == Mode::Engine) _worker.set_region_overlay(_roi_engine);
     _dirty = true;
 }
@@ -1139,12 +1141,15 @@ void ViewportPanel::handle_input(float /*item_h*/) {
         // active the camera keeps only what nothing competes for.
         const bool letters = !(_interactor && _interactor->blocks_fly_keys());
         NavCamera::Keys k;
-        k.w = letters && ImGui::IsKeyDown(ImGuiKey_W);
-        k.a = letters && ImGui::IsKeyDown(ImGuiKey_A);
-        k.s = letters && ImGui::IsKeyDown(ImGuiKey_S);
-        k.d = letters && ImGui::IsKeyDown(ImGuiKey_D);
-        k.e = letters && ImGui::IsKeyDown(ImGuiKey_E);
-        k.q = letters && ImGui::IsKeyDown(ImGuiKey_Q);
+        auto fly = [&](char c) {
+            return letters && ImGui::IsKeyDown((ImGuiKey)fly_key(c));
+        };
+        k.w = fly('w');
+        k.a = fly('a');
+        k.s = fly('s');
+        k.d = fly('d');
+        k.e = fly('e');
+        k.q = fly('q');
         // The claim is what the Shortcut() calls are for: an unclaimed arrow is
         // ALSO read by imgui's nav, which walks the focus along the toolbar.
         // IsKeyDown still reads it -- ownership only filters the owner-aware.
@@ -1528,7 +1533,7 @@ void ViewportPanel::draw_controls(bool engine) {
     place(check_w(msg::viewport_grid));
     if (ui::Checkbox(msg::viewport_grid, &_show_grid)) _dirty = true;
     ui::help_on_hover(msg::viewport_cameras_help);
-    if (_mode == Mode::Engine ? _roi_engine != nullptr : _roi_preview != nullptr) {
+    if (_mode == Mode::Engine ? _roi_engine != nullptr : (_roi_preview || _roi_points_inside)) {
         place(check_w(msg::viewport_region));
         if (ui::Checkbox(msg::viewport_region, &_show_roi)) _dirty = true;
         ui::help_on_hover(msg::viewport_region_help);
@@ -1857,6 +1862,7 @@ void ViewportPanel::draw_preview(const ImVec2& avail) {
     float target[3];
     model_point(_cam.target, target);
     _preview.set_overlay(_roi_preview, _show_roi);
+    _preview.dim_points_outside(_roi_points_inside, _show_roi);
     unsigned tex = _preview.render(W, H, view,
                                    (PreviewProjection)_cam_model,
                                    fx / (0.5f * W), fy / (0.5f * H),

@@ -1814,6 +1814,7 @@ void GuiApp::finish_batch() {
     for (int i = 0; i < (int)_batch.size(); i++)
         if (_batch[(size_t)i].enabled && batch_row_done(i)) {
             _batch[(size_t)i].enabled = false;
+            _batch[(size_t)i].done = true;
             _batch_dirty = true;
         }
     _batch_active = false;
@@ -7466,6 +7467,13 @@ void GuiApp::draw_batch() {
         if (ui::Button(msg::batch_clear_done)) _batch_confirm = BatchConfirm::ClearDone;
         ui::help_on_hover(msg::batch_clear_done_help);
         ImGui::EndDisabled();
+        int unchecked = 0;
+        for (const BatchRow& r : _batch) unchecked += !r.enabled;
+        ImGui::SameLine();
+        ImGui::BeginDisabled(unchecked == 0);
+        if (ui::Button(msg::batch_clear_unchecked)) _batch_confirm = BatchConfirm::ClearUnchecked;
+        ui::help_on_hover(msg::batch_clear_unchecked_help);
+        ImGui::EndDisabled();
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(busy_elsewhere);
@@ -7506,6 +7514,8 @@ void GuiApp::draw_batch() {
 }
 
 bool GuiApp::batch_row_done(int index) const {
+    // The flag outlives the task list, which a row edit or a restart clears.
+    if (index >= 0 && index < (int)_batch.size() && _batch[(size_t)index].done) return true;
     bool any = false;
     for (const BatchTask& t : _batch_tasks) {
         if (t.row != index) continue;
@@ -7526,18 +7536,23 @@ void GuiApp::draw_batch_confirm_modal() {
         _batch_confirm = BatchConfirm::None;
         return;
     }
-    const bool all = _batch_confirm == BatchConfirm::ClearList;
+    const BatchConfirm what = _batch_confirm;
+    const bool all = what == BatchConfirm::ClearList;
+    const bool unchecked = what == BatchConfirm::ClearUnchecked;
     ImGui::PushTextWrapPos(px(420.0f));
-    ui::Text(all ? msg::batch_clear_confirm : msg::batch_clear_done_confirm);
+    ui::Text(all ? msg::batch_clear_confirm
+             : unchecked ? msg::batch_clear_unchecked_confirm : msg::batch_clear_done_confirm);
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
-    if (ui::Button(all ? msg::batch_clear : msg::batch_clear_done, ImVec2(px(170.0f), 0))) {
+    if (ui::Button(all ? msg::batch_clear : unchecked ? msg::batch_clear_unchecked : msg::batch_clear_done,
+                   ImVec2(px(170.0f), 0))) {
         if (all) {
             _batch.clear();
         } else {
             std::vector<BatchRow> kept;
             for (int i = 0; i < (int)_batch.size(); i++)
-                if (!batch_row_done(i)) kept.push_back(_batch[(size_t)i]);
+                if (unchecked ? _batch[(size_t)i].enabled : !batch_row_done(i))
+                    kept.push_back(_batch[(size_t)i]);
             _batch.swap(kept);
         }
         _batch_tasks.clear();
@@ -7636,10 +7651,10 @@ void GuiApp::update_roi_overlay() {
         std::shared_ptr<const spirula::Region> roi = s->roi;
         const double rs = s->cfg.relative_scale.value_or(1.0f);
         const std::array<double, 3> c = s->ds.center;
-        const int64_t n = s->ds.points.num(), stride = std::max<int64_t>(1, n / 200000);
-        std::vector<float> world;
-        for (int64_t i = 0; i < n; i += stride)
-            for (int r = 0; r < 3; r++) world.push_back((float)(s->ds.points.xyz[(size_t)i * 3 + r] / rs + c[r]));
+        const int64_t n = s->ds.points.num();
+        std::vector<float> world((size_t)n * 3);
+        for (int64_t i = 0; i < n; i++)
+            for (int r = 0; r < 3; r++) world[(size_t)i * 3 + r] = (float)(s->ds.points.xyz[(size_t)i * 3 + r] / rs + c[r]);
         float rgb[3] = {1.0f, 0.55f, 0.1f};
         if (!s->cfg.partition.empty() && s->cfg.partition_part >= 0)
             spirula::part_color(s->cfg.partition_part, rgb);
@@ -7658,14 +7673,18 @@ void GuiApp::update_roi_overlay() {
             auto engine = std::make_shared<spirula::RegionOverlay>();
             auto preview = std::make_shared<spirula::RegionOverlay>();
             engine->add(m, rgb, to_engine);
+            engine->region = roi;
+            for (int r = 0; r < 3; r++) engine->shift[r] = c[r];
             preview->add(m, rgb, to_preview);
-            return RoiOverlays{engine, preview};
+            auto inside = std::make_shared<std::vector<uint8_t>>(world.size() / 3);
+            roi->contains_many(world.data(), (int64_t)inside->size(), inside->data());
+            return RoiOverlays{engine, preview, inside};
         });
         return;
     }
     if (_roi_job.valid() && _roi_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         const RoiOverlays o = _roi_job.get();
-        _viewport.set_region_overlay(o.engine, o.preview);
+        _viewport.set_region_overlay(o.engine, o.preview, o.points_inside);
     }
 }
 
@@ -7822,7 +7841,10 @@ void GuiApp::draw_batch_row(BatchRow& row, int index, int& remove, int& move) {
     ui::help_on_hover(msg::batch_row_expand_help);
     ImGui::SameLine();
     ImGui::BeginDisabled(_batch_active);
-    if (ui::CheckboxRaw("##en", &row.enabled)) batch_edited();
+    if (ui::CheckboxRaw("##en", &row.enabled)) {
+        if (row.enabled) row.done = false;
+        batch_edited();
+    }
     ui::help_on_hover(msg::batch_row_enabled_help);
     ImGui::EndDisabled();
     ImGui::SameLine();
@@ -7870,9 +7892,9 @@ void GuiApp::draw_batch_row(BatchRow& row, int index, int& remove, int& move) {
 
     // ---- status, and why ----
     // A row with no task in this run is not waiting for anything.
-    const BatchStatus st = row_status(_batch_tasks, index);
     bool in_run = false;
     for (const BatchTask& t : _batch_tasks) in_run = in_run || t.row == index;
+    const BatchStatus st = !in_run && row.done ? BatchStatus::Done : row_status(_batch_tasks, index);
     if (st != BatchStatus::Pending || (_batch_active && in_run)) {
         ImGui::Indent(ImGui::GetFrameHeight() * 2.0f);
         draw_status_word(st);
