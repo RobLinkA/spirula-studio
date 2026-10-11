@@ -1,8 +1,11 @@
-// cube_lut -- .cube parsing and the tetrahedral map (app/CubeLut.h). Any
-// interpolation reproduces an affine colour map exactly, and an identity LUT
-// must hand back every 8-bit value unchanged, so both are asserted per value.
+// cube_lut -- .cube parsing and the tetrahedral map (app/CubeLut.h), and the
+// built-in log LUTs (app/LogLuts.h). Any interpolation reproduces an affine
+// colour map exactly, and an identity LUT must hand back every 8-bit value
+// unchanged, so both are asserted per value.
 
 #include "app/CubeLut.h"
+#include "app/LogLuts.h"
+#include "app/tests/log_lut_checks.h"
 #include "core/SourcePath.h"
 
 #include <algorithm>
@@ -118,6 +121,9 @@ int main() {
                "too few samples fail");
         expect(refused("LUT_1D_SIZE 4\n0 0 0\n") && err.find("1D") != std::string::npos,
                "a 1D LUT fails as one");
+        expect(refused("LUT_1D_SIZE 2\nLUT_3D_SIZE 2\n0 0 0\n1 1 1\n") &&
+                   err.find("shaper") != std::string::npos,
+               "a shaper in front of the 3D LUT is named, not miscounted");
         expect(!app::load_cube_lut((fs::temp_directory_path() / "none.cube").string(), lut, err),
                "a missing file fails");
     }
@@ -125,6 +131,72 @@ int main() {
     expect(app::ffmpeg_lut3d_filter("C:\\LUTs\\a b,c'd.cube") ==
                R"(lut3d=file=C\\:/LUTs/a b\,c\\\'d.cube:interp=tetrahedral)",
            "ffmpeg escaping: " + app::ffmpeg_lut3d_filter("C:\\LUTs\\a b,c'd.cube"));
+
+    // What a .cube written here reads back as, to the digits it was written.
+    err.clear();
+    {
+        app::CubeLut a;
+        expect(app::load_cube_lut(write_cube("w.cube", 5, affine), a, err), "affine for writing");
+        const std::string p = (fs::temp_directory_path() / "w_out.cube").string();
+        app::CubeLut b;
+        expect(app::write_cube_lut(a, p, err) && app::load_cube_lut(p, b, err) &&
+                   b.size == a.size && b.title == a.title,
+               "write_cube_lut reads back " + err);
+        float worst = 0;
+        for (size_t i = 0; i < a.rgb.size() && b.rgb.size() == a.rgb.size(); i++)
+            worst = std::max(worst, std::fabs(a.rgb[i] - b.rgb[i]));
+        expect(worst < 1e-6f, "written values survive");
+    }
+
+    // A LUT re-exported under the same name is read again, not served stale.
+    {
+        const std::string p = write_cube("edit.cube", 2, identity);
+        const auto first = app::cube_lut_cached(p, err);
+        const auto again = app::cube_lut_cached(p, err);
+        write_cube("edit.cube", 3, affine);
+        const auto edited = app::cube_lut_cached(p, err);
+        expect(first && again == first && edited && edited != first && edited->size == 3 &&
+                   edited->serial != first->serial,
+               "the cache follows an edited file");
+    }
+
+    // Every built-in bakes, rises along grey, and is a file ffmpeg can read.
+    expect(!app::builtin_luts().empty(), "there are built-in LUTs");
+    for (const app::BuiltinLut& b : app::builtin_luts()) {
+        const std::string spec = app::builtin_lut_spec(b.id);
+        const auto lut = app::cube_lut_cached(spec, err);
+        bool ok = lut && lut->size > 1 && app::lut_display_name(spec) == b.name;
+        float grey_prev = -1;
+        for (int i = 0; ok && i < lut->size; i++) {
+            const float g = lut->rgb[(((size_t)i * lut->size + i) * lut->size + i) * 3 + 1];
+            ok = g >= grey_prev - 1.0f / 255 && g >= 0 && g <= 1;
+            grey_prev = g;
+        }
+        expect(ok, std::string(b.id) + ": bakes, grey rising " + err);
+        std::string file;
+        app::CubeLut back;
+        expect(app::cube_lut_file(spec, file, err) && app::load_cube_lut(file, back, err) &&
+                   back.size == lut->size,
+               std::string(b.id) + ": baked to a .cube ffmpeg reads " + err);
+    }
+    expect(!app::cube_lut_cached(app::builtin_lut_spec("no-such-lut"), err),
+           "an unknown built-in fails");
+    // A fitted look as tools/fit_log_luts.py evaluates it; GoPro's as GoPro's own
+    // LUT and generator give it.
+    for (const app::BuiltinLut& b : app::builtin_luts()) {
+        const auto lut = app::cube_lut_cached(app::builtin_lut_spec(b.id), err);
+        double worst = 0;
+        int checked = 0;
+        for (const LogLutCheck& c : kLogLutChecks) {
+            if (!lut || std::string(c.id) != b.id) continue;
+            const size_t at = (((size_t)c.b * lut->size + c.g) * lut->size + c.r) * 3;
+            for (int k = 0; k < 3; k++)
+                worst = std::max(worst, std::fabs((double)lut->rgb[at + k] - c.rgb[k]));
+            checked++;
+        }
+        expect(checked > 0 && worst < 5e-5,
+               std::string(b.id) + ": matches tools/fit_log_luts.py, worst " + std::to_string(worst));
+    }
 
     std::printf("%s: %d failure(s)\n", SS_FILE, g_failures);
     return g_failures ? 1 : 0;

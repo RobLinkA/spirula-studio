@@ -331,7 +331,7 @@ bool extract_frames(const FrameExtractJob& job_in, const FrameExtractSinks& sink
         lut = cube_lut_cached(job.lut, error);
         if (!lut) return false;
         log_line(sinks, spirula::i18n::format(lmsg::video_lut_applied,
-                                              {fs::path(job.lut).filename().string()}));
+                                              {lut_display_name(job.lut)}));
     }
 
     const bool pano = job.eac.valid() && !job.views.empty();
@@ -423,22 +423,22 @@ bool extract_frames(const FrameExtractJob& job_in, const FrameExtractSinks& sink
     }
 
     const Decode decode = [&](const std::vector<int>& tr, bool convert,
-                              const InstantSink& on_frame_in) {
-        // Only the kept instants reach the sink, so the LUT costs per frame
-        // written, not per frame decoded.
-        const InstantSink on_frame = !lut ? on_frame_in
-            : InstantSink([&](std::vector<nn::Image>& imgs, int64_t index, std::string& err) {
-                  for (nn::Image& im : imgs)
-                      apply_cube_lut(*lut, im.data.data(), im.data.size() / 3);
-                  return on_frame_in(imgs, index, err);
-              });
+                              const InstantSink& on_frame) {
 #ifdef SS_HAVE_VIDEO
+        // Mapped by the GPU conversion, before the 8-bit rounding.
         if (dec.builtin)
             return decode_lockstep_vulkan(job, sinks, tr, convert, plan, stats, error,
                                           on_frame);
 #endif
+        // ffmpeg hands over 8-bit RGB that the window is scored on, so the LUT
+        // goes on the instants kept, where it cannot move the choice.
+        const InstantSink mapped = [&](std::vector<nn::Image>& imgs, int64_t index,
+                                       std::string& err) {
+            for (nn::Image& im : imgs) apply_cube_lut(*lut, im.data.data(), im.data.size() / 3);
+            return on_frame(imgs, index, err);
+        };
         return decode_lockstep_ffmpeg(job, sinks, dec.facts, tr, convert, plan, stats,
-                                      error, on_frame);
+                                      error, lut ? mapped : on_frame);
     };
     if (pano) {
         stats.tracks = 2;

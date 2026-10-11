@@ -146,6 +146,28 @@ bool measure_motion_vulkan(const FrameExtractJob& o, const FrameExtractSinks& si
 // Extraction
 // ---------------------------------------------------------------------------
 
+namespace {
+
+// The look's LUT on the GPU conversion, which maps it before the 8-bit
+// rounding: a 10-bit log capture keeps its precision through the expansion.
+// `held` keeps the table alive for as long as `conv` points into it.
+bool convert_lut(const std::string& spec, video::ConvertOpts& conv,
+                 std::shared_ptr<const CubeLut>& held, std::string& error) {
+    if (spec.empty()) return true;
+    held = cube_lut_cached(spec, error);
+    if (!held) return false;
+    conv.lut = held->rgb.data();
+    conv.lut_size = held->size;
+    conv.lut_serial = held->serial;
+    for (int c = 0; c < 3; c++) {
+        conv.lut_min[c] = held->domain_min[c];
+        conv.lut_max[c] = held->domain_max[c];
+    }
+    return true;
+}
+
+}  // namespace
+
 // Several tracks decoded in lockstep under one sharpness window; the score is
 // summed over the tracks.
 bool decode_lockstep_vulkan(const FrameExtractJob& o, const FrameExtractSinks& sinks,
@@ -158,6 +180,8 @@ bool decode_lockstep_vulkan(const FrameExtractJob& o, const FrameExtractSinks& s
         conv.scale = o.scale;
         conv.rotate = o.rotate;
     }
+    std::shared_ptr<const CubeLut> lut;
+    if (!convert_lut(o.lut, conv, lut, error)) return false;
     std::vector<std::unique_ptr<video::VideoPipeline>> pipe;
     for (size_t k = 0; k < n; k++) {
         pipe.push_back(std::make_unique<video::VideoPipeline>());
@@ -356,13 +380,13 @@ bool extract_frames_at(const std::string& input, const FrameLook& look_in,
         return false;
     }
 
-    std::shared_ptr<const CubeLut> lut;
-    if (!look.lut.empty() && !(lut = cube_lut_cached(look.lut, error))) return false;
     video::ConvertOpts conv;
     if (!pano) {
         conv.scale = look.scale;
         conv.rotate = look.rotate;
     }
+    std::shared_ptr<const CubeLut> lut;
+    if (!convert_lut(look.lut, conv, lut, error)) return false;
     const size_t np = pano && pano360_needs_track1(look.eac) ? 2 : 1;
     std::vector<std::unique_ptr<video::VideoPipeline>> pipe(np);
     for (size_t k = 0; k < np; k++) {
@@ -402,10 +426,8 @@ bool extract_frames_at(const std::string& input, const FrameLook& look_in,
     };
     auto emit = [&](int64_t index) {
         std::vector<nn::Image> img(np);
-        for (size_t k = 0; k < np; k++) {
+        for (size_t k = 0; k < np; k++)
             if (!pipe[k]->toImage(held[k], conv, img[k], error)) return false;
-            if (lut) apply_cube_lut(*lut, img[k].data.data(), img[k].data.size() / 3);
-        }
         if (!pano) {
             if (look.packed_lenses >= 2) {
                 std::vector<uint8_t> lens;

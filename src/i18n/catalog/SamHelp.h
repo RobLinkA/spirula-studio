@@ -914,19 +914,32 @@ SS_MSG(xh_no_autorotate,
     TR("kareleri çekimin istediği açıyla döndürme"));
 
 SS_MSG(xh_lut,
-    EN("3D colour LUT (.cube) applied to every frame, e.g. the camera's log to Rec.709"),
-    JA("全フレームに適用する 3D カラー LUT（.cube）。例：カメラのログ→Rec.709"),
-    ZH_HANS("套用到每一帧的 3D 颜色 LUT（.cube），例如相机的 Log 转 Rec.709"),
-    ZH_HANT("套用到每一幀的 3D 色彩 LUT（.cube），例如相機的 Log 轉 Rec.709"),
-    KO("모든 프레임에 적용할 3D 색상 LUT(.cube). 예: 카메라의 로그→Rec.709"),
-    DE("3D-Farb-LUT (.cube) für jedes Einzelbild, z. B. Log zu Rec.709 der Kamera"),
-    FR("LUT couleur 3D (.cube) appliquée à chaque image, p. ex. log vers Rec.709"),
-    ES("LUT de color 3D (.cube) para cada fotograma, p. ej. log a Rec.709"),
-    PT("LUT de cor 3D (.cube) aplicada a cada fotograma, p. ex. log para Rec.709"),
-    IT("LUT colore 3D (.cube) applicata a ogni fotogramma, es. log verso Rec.709"),
-    NL("3D-kleur-LUT (.cube) voor elk beeld, bijv. log naar Rec.709 van de camera"),
-    RU("3D-LUT цвета (.cube) для каждого кадра, например лог → Rec.709 камеры"),
-    TR("Her kareye uygulanan 3D renk LUT'u (.cube), ör. kameranın log'dan Rec.709'a"));
+    EN("colour LUT applied to every frame: a .cube file, a built-in name ({0}), or "
+       "`auto` for the one the clip's own metadata names"),
+    JA("全フレームに適用するカラー LUT。.cube ファイル、内蔵 LUT の名前（{0}）、"
+       "またはクリップのメタデータが示すものを使う `auto`"),
+    ZH_HANS("套用到每一帧的颜色 LUT：.cube 文件、内置 LUT 名称（{0}），或 `auto`"
+            "（用片段自身元数据所指的 LUT）"),
+    ZH_HANT("套用到每一幀的色彩 LUT：.cube 檔案、內建 LUT 名稱（{0}），或 `auto`"
+            "（用片段本身中繼資料所指的 LUT）"),
+    KO("모든 프레임에 적용할 색상 LUT: .cube 파일, 내장 LUT 이름({0}), 또는 클립 "
+       "메타데이터가 가리키는 것을 쓰는 `auto`"),
+    DE("Farb-LUT für jedes Einzelbild: eine .cube-Datei, ein eingebauter Name ({0}) "
+       "oder `auto` für die, die die Metadaten des Clips nennen"),
+    FR("LUT couleur appliquée à chaque image : un fichier .cube, un nom intégré ({0}) "
+       "ou `auto` pour celle que nomment les métadonnées du clip"),
+    ES("LUT de color aplicada a cada fotograma: un archivo .cube, un nombre integrado "
+       "({0}) o `auto` para la que indican los metadatos del clip"),
+    PT("LUT de cor aplicada a cada fotograma: um arquivo .cube, um nome integrado "
+       "({0}) ou `auto` para a indicada pelos metadados do clipe"),
+    IT("LUT colore applicata a ogni fotogramma: un file .cube, un nome integrato "
+       "({0}) o `auto` per quella indicata dai metadati del clip"),
+    NL("kleur-LUT voor elk beeld: een .cube-bestand, een ingebouwde naam ({0}) of "
+       "`auto` voor de LUT die de metadata van de clip noemt"),
+    RU("цветовая LUT для каждого кадра: файл .cube, встроенное имя ({0}) или `auto` "
+       "— та, что указана в метаданных клипа"),
+    TR("her kareye uygulanan renk LUT'u: bir .cube dosyası, yerleşik bir ad ({0}) ya "
+       "da klibin kendi meta verisinin belirttiği için `auto`"));
 
 SS_MSG(xh_scale,
     EN("resize factor, at most 1"),

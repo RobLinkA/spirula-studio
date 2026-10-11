@@ -77,6 +77,7 @@ set(SS_TOOL_LIBS "")
 # including the ones the GUI spawns.
 list(APPEND SS_TOOL_SOURCES
      ${SS_SRC}/app/CubeLut.cpp
+     ${SS_SRC}/app/LogLuts.cpp
      ${SS_SRC}/app/FrameMask.cpp
      ${SS_SRC}/app/FrameMaskSvg.cpp
      ${SS_SRC}/app/FrameLook.cpp
@@ -356,6 +357,7 @@ if(SS_SEPARATE_TOOLS)
     endif()
     if(SS_BUILD_SAM)
         set(_sam_src ${SS_SRC}/app/cli/sam_main.cpp ${SS_SRC}/app/CubeLut.cpp
+                     ${SS_SRC}/app/LogLuts.cpp
                      ${SS_SRC}/app/FrameMask.cpp
                      ${SS_SRC}/app/FrameMaskSvg.cpp
                      ${SS_SRC}/app/FrameLook.cpp ${SS_SRC}/app/FrameMotion.cpp
@@ -398,7 +400,8 @@ endif()
 # .cube parsing and the tetrahedral map: a wrong colour is silent too.
 add_executable(cube_lut_test
     ${SS_SRC}/app/tests/cube_lut_test.cpp
-    ${SS_SRC}/app/CubeLut.cpp)
+    ${SS_SRC}/app/CubeLut.cpp
+    ${SS_SRC}/app/LogLuts.cpp)
 ss_configure_app(cube_lut_test)
 
 # The frame plan: no device, no GUI, and a wrong answer is silent.
@@ -567,6 +570,7 @@ if(SS_BUILD_GUI)
         ${SS_SRC}/app/FrameLook.cpp
         ${SS_SRC}/app/FrameMotion.cpp
         ${SS_SRC}/app/CubeLut.cpp
+        ${SS_SRC}/app/LogLuts.cpp
         ${SS_SRC}/app/Pano360.cpp)
     ss_configure_app(dataset_prep_test)
 
@@ -589,6 +593,7 @@ if(SS_BUILD_GUI)
         ${SS_SRC}/app/FrameLook.cpp
         ${SS_SRC}/app/FrameMotion.cpp
         ${SS_SRC}/app/CubeLut.cpp
+        ${SS_SRC}/app/LogLuts.cpp
         ${SS_SRC}/app/Pano360.cpp)
     ss_configure_app(dataset_plan_test)
 endif()

@@ -10,6 +10,7 @@
 
 #include "app/FfmpegVideo.h"
 #include "app/FrameExtract.h"
+#include "app/LogLuts.h"
 #include "app/Tools.h"
 #include "app/cli/ModelLicense.h"
 #include "i18n/catalog/Cli.h"
@@ -47,7 +48,7 @@ void set_env(const char* key, const char* value) {
 
 // A row of `--help`: identifier on the left, translated sentence on the right,
 // wrapped by i18n::wrap so a language without spaces still breaks.
-void help_row(const char* flags, const spirula::i18n::Msg& m) {
+void help_row(const char* flags, const std::string& text) {
     constexpr int kCol = 25;
     std::string left = std::string("  ") + flags;
     if (spirula::i18n::display_width(left) >= kCol) {
@@ -55,10 +56,14 @@ void help_row(const char* flags, const spirula::i18n::Msg& m) {
         left.clear();
     }
     left = spirula::i18n::pad_to(left, kCol);
-    for (const std::string& line : spirula::i18n::wrap(m.get(), 86 - kCol)) {
+    for (const std::string& line : spirula::i18n::wrap(text, 86 - kCol)) {
         std::fprintf(stderr, "%s%s\n", left.c_str(), line.c_str());
         left.assign(kCol, ' ');
     }
+}
+
+void help_row(const char* flags, const spirula::i18n::Msg& m) {
+    help_row(flags, std::string(m.get()));
 }
 
 void usage() {
@@ -75,7 +80,10 @@ void usage() {
     help_row("-r, --rotate <deg>", H::xh_rotate);
     help_row("    --no-autorotate", H::xh_no_autorotate);
     help_row("    --scale <f>", H::xh_scale);
-    help_row("    --lut <file.cube>", H::xh_lut);
+    std::string luts;
+    for (const app::BuiltinLut& b : app::builtin_luts())
+        luts += (luts.empty() ? "" : ", ") + std::string(b.id);
+    help_row("    --lut <file|name>", spirula::i18n::format(H::xh_lut, {luts}));
     help_row("    --track <i>", H::xh_track);
     help_row("    --sync", H::xh_sync);
     help_row("    --adaptive", H::xh_adaptive);
@@ -285,7 +293,9 @@ int sam_cli_extract(int argc, char** argv) {
     job.rotate = o.rotate;
     job.auto_rotate = o.auto_rotate;
     job.scale = o.scale;
-    job.lut = o.lut;
+    if (o.lut == "auto") job.lut = app::detect_log_lut(o.input);
+    else if (app::find_builtin_lut(o.lut)) job.lut = app::builtin_lut_spec(o.lut);
+    else job.lut = o.lut;
     job.track = o.track;
     job.sync_tracks = o.sync;
     job.adaptive = o.adaptive;

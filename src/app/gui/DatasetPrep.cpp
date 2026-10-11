@@ -1757,9 +1757,11 @@ bool DatasetPrep::append_lut_filter(const PrepJob& job, const PrepInput& in,
     if (lut.empty()) return true;
     // ffmpeg's own lut3d reads the file, but its complaint is buried in the
     // child's output; one read here says which file and why.
-    if (!app::cube_lut_cached(lut, error)) return false;
-    log(fmt(lmsg::video_lut_applied, {fs::path(lut).filename().string()}), false);
-    chain += (chain.empty() ? "" : ",") + app::ffmpeg_lut3d_filter(lut);
+    std::string file;
+    if (!app::cube_lut_cached(lut, error) || !app::cube_lut_file(lut, file, error))
+        return false;
+    log(fmt(lmsg::video_lut_applied, {app::lut_display_name(lut)}), false);
+    chain += (chain.empty() ? "" : ",") + app::ffmpeg_lut3d_filter(file);
     return true;
 }
 

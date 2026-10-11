@@ -3,6 +3,7 @@
 #include "dense/Artifact.h"
 #include "i18n/catalog/Dense.h"
 
+#include "app/CubeLut.h"
 #include "app/FrameMask.h"
 #include "app/gui/ColmapRunner.h"
 #include "app/gui/SfmRunner.h"
@@ -600,7 +601,7 @@ StepFields frames_fields(const PrepJob& job) {
         add(f, "fps", scope, every ? "every" : num(input_fps(job, in)));
         // The colours are baked into the frames, so another LUT is other frames.
         if (const std::string lut = input_lut(job, in); !lut.empty())
-            add(f, "lut", scope, norm_path(lut));
+            add(f, "lut", scope, app::is_builtin_lut(lut) ? lut : norm_path(lut));
         multi = multi || (!in.pano360.valid() && in.video_tracks >= 2);
         pano = pano || in.pano360.valid();
     }

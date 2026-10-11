@@ -2,14 +2,20 @@
 
 #include "app/CubeLut.h"
 
+#include "app/LogLuts.h"
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <mutex>
 #include <thread>
+
+namespace fs = std::filesystem;
 
 namespace app {
 
@@ -43,6 +49,20 @@ bool keyword(const std::string& line, const char* word, const char*& rest) {
 }
 
 }  // namespace
+
+bool is_builtin_lut(const std::string& spec) {
+    return spec.rfind(kBuiltinLutPrefix, 0) == 0;
+}
+
+std::string builtin_lut_spec(const std::string& id) { return kBuiltinLutPrefix + id; }
+
+std::string lut_display_name(const std::string& spec) {
+    if (is_builtin_lut(spec)) {
+        const BuiltinLut* b = find_builtin_lut(spec.substr(std::strlen(kBuiltinLutPrefix)));
+        return b ? b->name : spec;
+    }
+    return fs::path(spec).filename().string();
+}
 
 bool load_cube_lut(const std::string& path, CubeLut& out, std::string& error) {
     out = CubeLut();
@@ -98,6 +118,12 @@ bool load_cube_lut(const std::string& path, CubeLut& out, std::string& error) {
                 error = (has_1d ? "a 1D LUT, not a 3D one: " : "no LUT_3D_SIZE before the data: ") + path;
                 return false;
             }
+            // Resolve writes the shaper's samples first; read as 3D they would
+            // only surface as a wrong count.
+            if (has_1d) {
+                error = "a 1D shaper in front of the 3D LUT is not supported: " + path;
+                return false;
+            }
             out.rgb.insert(out.rgb.end(), v, v + 3);
         }
     }
@@ -118,17 +144,87 @@ bool load_cube_lut(const std::string& path, CubeLut& out, std::string& error) {
     return true;
 }
 
-std::shared_ptr<const CubeLut> cube_lut_cached(const std::string& path,
+bool write_cube_lut(const CubeLut& lut, const std::string& path, std::string& error) {
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) {
+        error = "cannot write " + path;
+        return false;
+    }
+    if (!lut.title.empty()) std::fprintf(f, "TITLE \"%s\"\n", lut.title.c_str());
+    std::fprintf(f, "LUT_3D_SIZE %d\nDOMAIN_MIN %.9g %.9g %.9g\nDOMAIN_MAX %.9g %.9g %.9g\n",
+                 lut.size, lut.domain_min[0], lut.domain_min[1], lut.domain_min[2],
+                 lut.domain_max[0], lut.domain_max[1], lut.domain_max[2]);
+    for (size_t i = 0; i + 2 < lut.rgb.size(); i += 3)
+        std::fprintf(f, "%.7f %.7f %.7f\n", lut.rgb[i], lut.rgb[i + 1], lut.rgb[i + 2]);
+    const bool ok = std::fclose(f) == 0;
+    if (!ok) error = "cannot write " + path;
+    return ok;
+}
+
+std::shared_ptr<const CubeLut> cube_lut_cached(const std::string& spec,
                                                std::string& error) {
+    struct Entry {
+        std::shared_ptr<const CubeLut> lut;
+        fs::file_time_type mtime;
+        uintmax_t bytes = 0;
+    };
     static std::mutex mu;
-    static std::map<std::string, std::shared_ptr<const CubeLut>> cache;
+    static std::map<std::string, Entry> cache;
+    static uint64_t serial = 0;
     std::lock_guard<std::mutex> lock(mu);
-    auto it = cache.find(path);
-    if (it != cache.end()) return it->second;
+    const bool builtin = is_builtin_lut(spec);
+    Entry now;
+    if (!builtin) {
+        // A LUT re-exported from the grading tool keeps its name.
+        std::error_code ec;
+        now.mtime = fs::last_write_time(spec, ec);
+        now.bytes = fs::file_size(spec, ec);
+    }
+    auto it = cache.find(spec);
+    if (it != cache.end() && it->second.mtime == now.mtime && it->second.bytes == now.bytes)
+        return it->second.lut;
     auto lut = std::make_shared<CubeLut>();
-    if (!load_cube_lut(path, *lut, error)) return nullptr;
-    cache[path] = lut;
+    const bool ok =
+        builtin ? bake_builtin_lut(spec.substr(std::strlen(kBuiltinLutPrefix)), *lut, error)
+                : load_cube_lut(spec, *lut, error);
+    if (!ok) return nullptr;
+    lut->serial = ++serial;
+    now.lut = lut;
+    cache[spec] = now;
     return lut;
+}
+
+bool cube_lut_file(const std::string& spec, std::string& path, std::string& error) {
+    if (!is_builtin_lut(spec)) {
+        path = spec;
+        return true;
+    }
+    const std::shared_ptr<const CubeLut> lut = cube_lut_cached(spec, error);
+    if (!lut) return false;
+    uint64_t h = 1469598103934665603ull;   // FNV-1a over the table
+    for (float v : lut->rgb) {
+        uint32_t bits;
+        std::memcpy(&bits, &v, sizeof bits);
+        h = (h ^ bits) * 1099511628211ull;
+    }
+    char name[96];
+    std::snprintf(name, sizeof name, "%s-%016llx.cube",
+                  spec.substr(std::strlen(kBuiltinLutPrefix)).c_str(), (unsigned long long)h);
+    std::error_code ec;
+    const fs::path dir = fs::temp_directory_path(ec) / "spirula-luts";
+    fs::create_directories(dir, ec);
+    path = (dir / name).string();
+    if (fs::is_regular_file(path, ec)) return true;
+    // Written beside and renamed, so a second run never reads half a file.
+    const std::string tmp = path + ".part" + std::to_string(lut->serial);
+    if (!write_cube_lut(*lut, tmp, error)) return false;
+    fs::rename(tmp, path, ec);
+    if (ec && !fs::is_regular_file(path)) {
+        error = "cannot write " + path;
+        return false;
+    }
+    fs::remove(tmp, ec);
+    return true;
 }
 
 void apply_cube_lut(const CubeLut& lut, uint8_t* rgb, size_t pixels, int threads) {
