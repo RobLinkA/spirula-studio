@@ -32,9 +32,11 @@ int read_floats(const char* p, const char* end, float* out, int n) {
     while (k < n) {
         p = skip_space(p, end);
         if (p >= end) break;
-        const std::from_chars_result r = std::from_chars(p, end, out[k], std::chars_format::general);
-        if (r.ec != std::errc()) break;
-        p = r.ptr;
+        char* parsed_end = nullptr;
+        out[k] = std::strtof(p, &parsed_end);
+        if (parsed_end == p || parsed_end > end)
+            break;
+        p = parsed_end;
         ++k;
     }
     return k;
