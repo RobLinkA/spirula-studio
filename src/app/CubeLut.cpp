@@ -32,7 +32,7 @@ int read_floats(const char* p, const char* end, float* out, int n) {
     while (k < n) {
         p = skip_space(p, end);
         if (p >= end) break;
-        const std::from_chars_result r = std::from_chars(p, end, out[k]);
+        const std::from_chars_result r = std::from_chars(p, end, out[k], std::chars_format::general);
         if (r.ec != std::errc()) break;
         p = r.ptr;
         ++k;
