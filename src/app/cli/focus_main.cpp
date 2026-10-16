@@ -4,6 +4,7 @@
 
 #include "app/FocusWeight.h"
 #include "app/FocusMaskMerge.h"
+#include "app/FocusOverlay.h"
 #include "core/FileLock.h"
 #include "data/DatasetParser.h"
 #include "i18n/Message.h"
@@ -16,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <numeric>
 #include <string>
 #include <set>
 #include <vector>
@@ -33,8 +35,10 @@ struct Options {
     std::string image_dir = "images";
     std::string depth_dir = "depths";
     std::string out_dir = "masks";
+    std::string overlay_dir = "focus_overlay";
     app::FocusSettings focus;
     bool overwrite = false;
+    bool overlay_only = false;
 };
 
 void help_row(const char* flags, const spirula::i18n::Msg& m, int col = 26) {
@@ -60,6 +64,8 @@ void usage() {
     help_row("--image-dir <dir>", G::opt_image_dir);
     help_row("--depth-dir <dir>", F::opt_depth_dir);
     help_row("--out-dir <dir>", F::opt_out_dir);
+    help_row("--overlay-dir <dir>", F::opt_overlay_dir);
+    help_row("--overlay-only", F::opt_overlay_only);
     help_row("--allowed <px>", F::opt_allowed);
     help_row("--train-side <px>", F::opt_train_side);
     help_row("--overwrite", F::opt_overwrite);
@@ -96,6 +102,8 @@ int spirula_focus_main(int argc, char** argv) {
         else if (a == "--image-dir") o.image_dir = next();
         else if (a == "--depth-dir") o.depth_dir = next();
         else if (a == "--out-dir") o.out_dir = next();
+        else if (a == "--overlay-dir") o.overlay_dir = next();
+        else if (a == "--overlay-only") o.overlay_only = true;
         else if (a == "--allowed") o.focus.allowed_px = (float)std::atof(next());
         else if (a == "--train-side") o.focus.train_side = std::atoi(next());
         else if (a == "--overwrite") o.overwrite = true;
@@ -117,9 +125,43 @@ int spirula_focus_main(int argc, char** argv) {
         cfg.image_dir = o.image_dir;
         const ParsedDataset ds = parse_dataset(o.dataset, cfg, "");
         const fs::path root(o.dataset);
+        const fs::path overlay_root = fs::weakly_canonical(root / o.overlay_dir);
+        auto overlaps = [&](const fs::path& other) {
+            const fs::path canonical = fs::weakly_canonical(other);
+            const auto a = canonical.lexically_relative(overlay_root);
+            const auto b = overlay_root.lexically_relative(canonical);
+            return (!a.empty() && *a.begin() != "..") || (!b.empty() && *b.begin() != "..");
+        };
+        if (overlaps(root / cfg.image_dir) || overlaps(root / o.out_dir) || overlaps(root / o.depth_dir) ||
+            overlaps(root / ".spirula-focus"))
+            throw std::runtime_error("overlay directory must be separate from images, masks, depths and focus backups");
+        const fs::path image_root = root / cfg.image_dir;
+        std::vector<app::FocusOverlayEntry> previews;
+        if (o.overlay_only) {
+            int64_t written = 0;
+            for (size_t i = 0; i < ds.image_filenames.size(); ++i) {
+                const auto& image = ds.image_filenames[i];
+                const std::string relative = dsparse::relative_under(image, image_root.string());
+                if (relative.empty()) throw std::runtime_error("image is outside the image directory");
+                const std::string mask = dsparse::find_aux_file((root / o.out_dir).string(), relative, "mask");
+                const nn::Image img = nn::load_image(image);
+                if (img.empty()) throw std::runtime_error("cannot read image: " + image);
+                if (mask.empty()) std::fprintf(stderr, "%s\n", format(F::log_overlay_unmasked, {relative}).c_str());
+                const auto weight = mask.empty() ? std::vector<uint8_t>((size_t)img.width * img.height, 255)
+                                                : app::read_focus_overlay_mask(mask, img.width, img.height);
+                app::write_focus_overlay(img, weight, overlay_root / (relative + ".jpg"));
+                const double mean = std::accumulate(weight.begin(), weight.end(), 0.0) / (255.0 * weight.size());
+                previews.push_back({relative, mean});
+                std::printf("[%zu/%zu] %s\n", i + 1, ds.image_filenames.size(), relative.c_str());
+                std::fflush(stdout);
+                ++written;
+            }
+            app::write_focus_overlay_gallery(previews, overlay_root);
+            std::printf("%s\n", format(F::log_overlays, {(long long)written, overlay_root.string()}).c_str());
+            return 0;
+        }
         fs::create_directories(root / ".spirula-focus");
         const spirula::FileLock lock(root / ".spirula-focus" / "run.lock");
-        const fs::path image_root = root / cfg.image_dir;
         std::error_code ec;
         auto rel_of = [&](const std::string& image, const char* ext) {
             fs::path rel = fs::relative(fs::path(image), image_root, ec);
@@ -165,9 +207,12 @@ int spirula_focus_main(int argc, char** argv) {
                 weight.assign((size_t)img.width * img.height, 255);
             }
             app::write_focus_mask(targets[i], weight, img.width, img.height);
+            const std::string relative = dsparse::relative_under(image, image_root.string());
+            app::write_focus_overlay(img, weight, overlay_root / (relative + ".jpg"));
             double mean = 0;
             for (uint8_t v : weight) mean += v;
             mean /= 255.0 * (double)weight.size();
+            previews.push_back({relative, mean});
             char m[16], r[16];
             std::snprintf(m, sizeof m, "%.3f", mean);
             std::snprintf(r, sizeof r, "%.2f", curve.rms);
@@ -177,7 +222,9 @@ int spirula_focus_main(int argc, char** argv) {
             std::fflush(stdout);
             ++written;
         }
+        app::write_focus_overlay_gallery(previews, overlay_root);
         std::printf("%s\n", format(F::log_done, {(long long)written, (long long)skipped, (long long)no_depth}).c_str());
+        std::printf("%s\n", format(F::log_overlays, {(long long)written, overlay_root.string()}).c_str());
         return no_depth > 0 ? 1 : 0;
     } catch (const std::exception& e) {
         std::fprintf(stderr, "\nerror: %s\n", e.what());

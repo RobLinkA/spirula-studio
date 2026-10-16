@@ -177,7 +177,8 @@ if(SS_BUILD_SAM)
     list(APPEND SS_TOOL_SOURCES
          ${SS_SRC}/app/cli/focus_main.cpp
          ${SS_SRC}/app/FocusWeight.cpp
-         ${SS_SRC}/app/FocusMaskMerge.cpp)
+         ${SS_SRC}/app/FocusMaskMerge.cpp
+         ${SS_SRC}/app/FocusOverlay.cpp)
     list(APPEND SS_TOOL_DEFS SS_TOOL_FOCUS=1)
 endif()
 

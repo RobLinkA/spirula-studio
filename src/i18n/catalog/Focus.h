@@ -188,6 +188,78 @@ SS_MSG(log_done,
     RU("Записано карт весов: {0}, пропущено: {1}, без глубины: {2}"),
     TR("{0} ağırlık haritası yazıldı, {1} atlandı, {2} derinliksiz"));
 
+SS_MSG(overlay_title,
+    EN("Final training mask previews"), JA("最終学習マスクのプレビュー"),
+    ZH_HANS("最终训练遮罩染色图"), ZH_HANT("最終訓練遮罩染色圖"),
+    KO("최종 학습 마스크 미리보기"), DE("Vorschau der endgültigen Trainingsmasken"),
+    FR("Aperçus des masques finaux d’entraînement"), ES("Vistas de máscaras finales de entrenamiento"),
+    PT("Prévias das máscaras finais de treino"), IT("Anteprime delle maschere finali di addestramento"),
+    NL("Voorbeelden van definitieve trainingsmaskers"), RU("Превью итоговых масок обучения"),
+    TR("Son eğitim maskesi önizlemeleri"));
+
+SS_MSG(overlay_legend,
+    EN("Original color: full weight. More blue: lower weight. Strongest blue: zero weight. Includes existing segmentation masks. Percentages show mean mask weight."),
+    JA("原色：全重み。青が濃いほど低重み。最も濃い青：重みゼロ。既存の領域マスクを含みます。割合は平均マスク重みです。"),
+    ZH_HANS("原色＝完整权重；蓝色越浓＝权重越低；最浓蓝色＝零权重。包含原有抠图遮罩的效果，百分比为平均遮罩权重。"),
+    ZH_HANT("原色＝完整權重；藍色越濃＝權重越低；最濃藍色＝零權重。包含原有去背遮罩的效果，百分比為平均遮罩權重。"),
+    KO("원색: 전체 가중치. 파란색이 진할수록 낮은 가중치. 가장 진한 파란색: 가중치 0. 기존 분할 마스크 포함. 백분율은 평균 마스크 가중치입니다."),
+    DE("Originalfarbe: volles Gewicht. Mehr Blau: weniger Gewicht. Stärkstes Blau: Gewicht null. Vorhandene Segmentierungsmasken sind enthalten. Prozentwerte zeigen das mittlere Maskengewicht."),
+    FR("Couleur originale : poids complet. Plus de bleu : poids réduit. Bleu maximal : poids nul. Les masques de segmentation existants sont inclus. Pourcentages : poids moyen du masque."),
+    ES("Color original: peso completo. Más azul: menor peso. Azul máximo: peso cero. Incluye máscaras de segmentación existentes. Porcentajes: peso medio de la máscara."),
+    PT("Cor original: peso completo. Mais azul: menor peso. Azul máximo: peso zero. Inclui máscaras de segmentação existentes. Percentuais: peso médio da máscara."),
+    IT("Colore originale: peso completo. Più blu: peso minore. Blu massimo: peso zero. Include le maschere di segmentazione esistenti. Percentuali: peso medio della maschera."),
+    NL("Oorspronkelijke kleur: volledig gewicht. Meer blauw: lager gewicht. Sterkst blauw: gewicht nul. Inclusief bestaande segmentatiemaskers. Percentages tonen het gemiddelde maskergewicht."),
+    RU("Исходный цвет: полный вес. Больше синего: меньше вес. Максимальный синий: нулевой вес. Включены готовые маски сегментации. Проценты показывают средний вес маски."),
+    TR("Özgün renk: tam ağırlık. Daha mavi: daha düşük ağırlık. En koyu mavi: sıfır ağırlık. Mevcut bölümleme maskeleri dahildir. Yüzdeler ortalama maske ağırlığını gösterir."));
+
+SS_MSG(opt_overlay_dir,
+    EN("Final-mask tint previews, maximum side 2000 px (default: focus_overlay)"),
+    JA("最終マスクの着色プレビュー、長辺最大2000 px（既定：focus_overlay）"),
+    ZH_HANS("最终遮罩染色预览，长边最多 2000 像素（默认：focus_overlay）"),
+    ZH_HANT("最終遮罩染色預覽，長邊最多 2000 像素（預設：focus_overlay）"),
+    KO("최종 마스크 색상 미리보기, 최대 변 2000 px (기본: focus_overlay)"),
+    DE("Farbvorschau der endgültigen Masken, längste Seite 2000 px (Standard: focus_overlay)"),
+    FR("Aperçus colorés des masques finaux, côté maximal 2000 px (défaut : focus_overlay)"),
+    ES("Vistas coloreadas de máscaras finales, lado máximo 2000 px (predeterminado: focus_overlay)"),
+    PT("Prévias coloridas das máscaras finais, lado máximo 2000 px (padrão: focus_overlay)"),
+    IT("Anteprime colorate delle maschere finali, lato massimo 2000 px (predefinito: focus_overlay)"),
+    NL("Kleurvoorbeelden van definitieve maskers, langste zijde 2000 px (standaard: focus_overlay)"),
+    RU("Цветные превью итоговых масок, длинная сторона до 2000 px (по умолчанию: focus_overlay)"),
+    TR("Son maskelerin renkli önizlemeleri, en uzun kenar 2000 px (varsayılan: focus_overlay)"));
+
+SS_MSG(opt_overlay_only,
+    EN("Render existing masks only; do not calculate depth/focus or modify masks"),
+    JA("既存マスクのみ描画。深度・合焦の計算やマスクの変更は行いません"),
+    ZH_HANS("仅用现有 masks 生成染色图，不计算深度或实焦，不修改遮罩"),
+    ZH_HANT("僅用現有 masks 產生染色圖，不計算深度或實焦，不修改遮罩"),
+    KO("기존 마스크만 렌더링하며 깊이/초점을 계산하거나 마스크를 변경하지 않음"),
+    DE("Nur vorhandene Masken darstellen; keine Tiefen-/Fokusberechnung oder Maskenänderung"),
+    FR("Afficher seulement les masques existants, sans calcul de profondeur/netteté ni modification"),
+    ES("Representar solo máscaras existentes, sin calcular profundidad/enfoque ni modificarlas"),
+    PT("Renderizar apenas máscaras existentes, sem calcular profundidade/foco nem alterá-las"),
+    IT("Visualizza solo le maschere esistenti, senza calcolare profondità/fuoco né modificarle"),
+    NL("Alleen bestaande maskers weergeven; geen diepte/focus berekenen of maskers wijzigen"),
+    RU("Только визуализация готовых масок без расчёта глубины/резкости и изменения масок"),
+    TR("Yalnızca mevcut maskeleri göster; derinlik/odak hesaplama veya maskeleri değiştirme"));
+
+SS_MSG(log_overlay_unmasked,
+    EN("No mask, using full weight: {0}"), JA("マスクなし、全重みを使用：{0}"),
+    ZH_HANS("没有遮罩，按完整权重显示：{0}"), ZH_HANT("沒有遮罩，按完整權重顯示：{0}"),
+    KO("마스크 없음, 전체 가중치 사용: {0}"), DE("Keine Maske, volles Gewicht: {0}"),
+    FR("Sans masque, poids complet : {0}"), ES("Sin máscara, peso completo: {0}"),
+    PT("Sem máscara, peso completo: {0}"), IT("Nessuna maschera, peso completo: {0}"),
+    NL("Geen masker, volledig gewicht: {0}"), RU("Нет маски, полный вес: {0}"),
+    TR("Maske yok, tam ağırlık kullanılıyor: {0}"));
+
+SS_MSG(log_overlays,
+    EN("Final-mask previews: {0}; directory: {1}"), JA("最終マスクのプレビュー：{0}、出力先：{1}"),
+    ZH_HANS("最终遮罩染色图：{0}；目录：{1}"), ZH_HANT("最終遮罩染色圖：{0}；目錄：{1}"),
+    KO("최종 마스크 미리보기: {0}; 폴더: {1}"), DE("Vorschau der endgültigen Masken: {0}; Verzeichnis: {1}"),
+    FR("Aperçus des masques finaux : {0} ; dossier : {1}"), ES("Vistas de máscaras finales: {0}; carpeta: {1}"),
+    PT("Prévias das máscaras finais: {0}; pasta: {1}"), IT("Anteprime delle maschere finali: {0}; cartella: {1}"),
+    NL("Voorbeelden definitieve maskers: {0}; map: {1}"), RU("Превью итоговых масок: {0}; каталог: {1}"),
+    TR("Son maske önizlemeleri: {0}; dizin: {1}"));
+
 }  // namespace focus
 }  // namespace msg
 }  // namespace i18n

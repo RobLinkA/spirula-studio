@@ -43,6 +43,26 @@ spirula focus <dataset> --allowed 1.4 --train-side 5760
 读取 `depths/`，生成并合并 `masks/`。缺少深度时提示先执行 `spirula geometry --depth`。
 已有 masks 不会导致跳过生成。模型沿用 Spirula 的模型缓存或界面选定的模型路径，分发包不含深度模型。
 
+## 最终遮罩染色图
+
+计算实焦权重并写入 masks 后，会同时在 `focus_overlay/` 输出 JPEG 染色预览。
+染色依据是与原遮罩合并后的最终 masks：白色权重区域保持原色，权重越低蓝色越浓；
+权重为零时蓝色混合强度为 65%，仍能看到原图细节。原有 SAM 等遮罩排除的区域同样染色。
+预览长边最多 2000 像素，沿用原始栅格方向，不应用 EXIF 旋转；预览不参与训练。
+保留子目录，文件名在完整原图名称后追加 `.jpg`，避免不同图片格式同名时覆盖。
+完成后打开同目录的 `index.html`，可按文件名搜索、分页浏览、点击单张放大；
+每张图的百分比表示最终遮罩的平均权重，页面不依赖网络。
+
+已有最终 masks 时，可单独生成染色图，无需深度或模型，也不会修改 masks 或备份状态：
+
+```text
+spirula focus <dataset> --overlay-only
+```
+
+`--out-dir` 指定读取的 masks 目录，`--overlay-dir` 指定染色图目录。
+缺少遮罩时按完整权重显示；损坏或尺寸不一致的遮罩报错。
+染色呈现 masks 的逐像素权重；训练仍须启用数据集遮罩，其他训练屏蔽选项可能进一步限制参与范围。
+
 ## Method
 
 1. **Depth.** `spirula geometry --depth` (MoGe-2; `--model moge2-vitl` is the
