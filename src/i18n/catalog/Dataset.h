@@ -14200,43 +14200,19 @@ SS_MSG(geom_write_focus,
     TR("Odak ağırlıkları"));
 
 SS_MSG(geom_write_focus_help,
-    EN("After the depth maps, measure how sharp each pixel is and write focus/: "
-       "out-of-focus pixels then count less in training, so they leave fewer "
-       "blurry Gaussians and floaters. Depth maps are written too."),
-    JA("深度マップの後に各画素の鮮明さを測り、focus/ を書き出します。ピンぼけの"
-       "画素は学習での重みが下がり、ぼやけたガウシアンや浮遊物が減ります。深度マップ"
-       "も書き出されます。"),
-    ZH_HANS("在深度图之后测量每个像素的清晰程度并写出 focus/：失焦像素在训练中的"
-            "权重会降低，从而减少发糊的高斯和漂浮物。同时也会写出深度图。"),
-    ZH_HANT("在深度圖之後量測每個像素的清晰程度並寫出 focus/：失焦像素在訓練中的"
-            "權重會降低，從而減少發糊的高斯和漂浮物。同時也會寫出深度圖。"),
-    KO("깊이 맵 다음에 각 픽셀의 선명도를 측정해 focus/ 를 씁니다. 초점이 나간 "
-       "픽셀은 학습에서 덜 반영되어 흐린 가우시안과 부유물이 줄어듭니다. 깊이 맵도 "
-       "함께 씁니다."),
-    DE("Misst nach den Tiefenkarten, wie scharf jedes Pixel ist, und schreibt focus/: "
-       "unscharfe Pixel zählen im Training weniger und hinterlassen weniger verwaschene "
-       "Gaussians und Floater. Tiefenkarten werden ebenfalls geschrieben."),
-    FR("Après les cartes de profondeur, mesure la netteté de chaque pixel et écrit "
-       "focus/ : les pixels flous comptent moins à l'entraînement et laissent moins de "
-       "gaussiennes floues et de flottants. Les cartes de profondeur sont aussi écrites."),
-    ES("Tras los mapas de profundidad, mide lo nítido que es cada píxel y escribe "
-       "focus/: los píxeles desenfocados cuentan menos al entrenar y dejan menos "
-       "gaussianas borrosas y flotantes. También se escriben los mapas de profundidad."),
-    PT("Após os mapas de profundidade, mede o quão nítido é cada pixel e escreve "
-       "focus/: pixels desfocados contam menos no treino e deixam menos gaussianas "
-       "borradas e flutuantes. Os mapas de profundidade também são escritos."),
-    IT("Dopo le mappe di profondità misura quanto è nitido ogni pixel e scrive "
-       "focus/: i pixel sfocati contano meno nell'addestramento e lasciano meno "
-       "gaussiane sfocate e floater. Vengono scritte anche le mappe di profondità."),
-    NL("Meet na de dieptekaarten hoe scherp elke pixel is en schrijft focus/: "
-       "onscherpe pixels tellen minder mee in de training en laten minder wazige "
-       "Gaussians en zwevers achter. Ook de dieptekaarten worden geschreven."),
-    RU("После карт глубины измеряет резкость каждого пикселя и пишет focus/: "
-       "пиксели вне фокуса меньше учитываются в обучении и оставляют меньше "
-       "размытых гауссиан и «плавающих» артефактов. Карты глубины тоже пишутся."),
-    TR("Derinlik haritalarından sonra her pikselin netliğini ölçer ve focus/ "
-       "yazar: odak dışı pikseller eğitimde daha az sayılır, daha az bulanık "
-       "Gauss ve yüzen parça bırakır. Derinlik haritaları da yazılır."));
+    EN("Merge focus confidence into masks/ after backing up original masks. Missing masks count as white. Training reads the merged grayscale masks automatically; no training switch is needed."),
+    JA("元のマスクをバックアップして合焦信頼度を masks/ に乗算します。マスクがなければ白として扱います。学習は統合済みのグレースケールマスクを自動で読みます。"),
+    ZH_HANS("先备份原遮罩，再将实焦置信度乘入 masks/；没有原遮罩时按全白处理。训练自动读取合并后的灰度遮罩，无需额外开关。"),
+    ZH_HANT("先備份原遮罩，再將實焦置信度乘入 masks/；沒有原遮罩時按全白處理。訓練自動讀取合併後的灰階遮罩，無需額外開關。"),
+    KO("원본 마스크를 백업한 뒤 초점 신뢰도를 masks/ 에 곱합니다. 마스크가 없으면 흰색으로 처리합니다. 학습은 병합된 회색조 마스크를 자동으로 읽습니다."),
+    DE("Fokusgewichte nach Sicherung der Originalmasken mit masks/ multiplizieren. Fehlende Masken gelten als weiß. Das Training liest die Graustufenmasken automatisch."),
+    FR("Sauvegarde les masques puis multiplie la confiance de netteté dans masks/. Un masque absent vaut blanc. L’entraînement lit automatiquement les masques en niveaux de gris."),
+    ES("Respalda las máscaras y multiplica la confianza de enfoque en masks/. Sin máscara se usa blanco. El entrenamiento lee automáticamente las máscaras en escala de grises."),
+    PT("Salva as máscaras originais e multiplica a confiança de foco em masks/. Máscaras ausentes valem branco. O treino lê automaticamente as máscaras em tons de cinza."),
+    IT("Salva le maschere originali e moltiplica la confidenza di fuoco in masks/. Le maschere assenti valgono bianco. L’addestramento legge automaticamente le maschere in scala di grigi."),
+    NL("Maakt een reservekopie en vermenigvuldigt focusgewichten met masks/. Ontbrekende maskers gelden als wit. De training leest de grijswaardenmaskers automatisch."),
+    RU("Сохраняет исходные маски и умножает веса резкости на masks/. Отсутствующая маска считается белой. Обучение автоматически читает маски в градациях серого."),
+    TR("Özgün maskeleri yedekler ve odak güvenini masks/ ile çarpar. Eksik maske beyaz sayılır. Eğitim birleştirilmiş gri tonlu maskeleri otomatik okur."));
 
 SS_MSG(geom_focus_prefers_large,
     EN("Focus weights were tuned on MoGe-2 large depth; other models give "

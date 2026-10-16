@@ -192,7 +192,7 @@ struct GTData {
     DeviceTensor3D<float>  depth;
     DeviceTensor3D<float3> normal;
     DeviceTensor3D<bool>   alpha;
-    // Weighted masks (focus/): `alpha` is the strict 0/1 split of these bytes.
+    // masks/ bytes stay continuous; alpha contains their nonzero support.
     DeviceTensor3D<bool>   mask_weight;
     bool has_gt   = false;
     bool has_mask = false;

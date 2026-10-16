@@ -1,8 +1,4 @@
-// MaskWeight.cu -- a mask carrying per-pixel weights (0..255, focus/ times
-// masks/): the strict 0/1 mask every other consumer reads, and the weight
-// applied to a per-pixel buffer. docs/notes/focus-weights.md.
-//
-// Part of the PixelWise family -- see PixelWiseCommon.cuh.
+// Split continuous masks/ weights into support and photometric weight.
 
 #include "kernels/pixelwise/PixelWiseCommon.cuh"
 

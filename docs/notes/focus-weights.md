@@ -1,13 +1,47 @@
-# Focus weights (`spirula focus`, `focus/`)
+# 实焦置信度与训练遮罩（`spirula focus`）
 
-Photos taken with a real lens are sharp only near one distance. Pixels outside
-the depth of field still enter the photometric loss at full strength, and the
-trainer answers them with blurry Gaussians and floaters. `spirula focus`
-writes, per image, an 8-bit weight map to `focus/` (same relative path as the
-image, `.png`): 255 where the pixel is as sharp as the lens gets, falling to 0
-as its defocus blur exceeds what the training resolution can tell apart.
-Training multiplies it into the dataset's mask (`masks/`), so a person masked
-out stays masked out and the two never fight.
+本地版本基于上游 release `v2026.10.16`（`65246c5579c127081bff6f4422bd12a542906f78`）。
+在“数据集 / 空三”的深度与法线步骤勾选实焦权重，自动选择 MoGe-2 大模型。
+实焦算法保持不变，最终结果直接合并写入数据集的 `masks/`。
+
+- 有原遮罩：`最终遮罩 = 原遮罩 × 实焦置信度`，均按 0–1 权重计算。
+- 没有原遮罩：按全白、权重 1 处理，直接生成同名 PNG 实焦遮罩。
+- 保留图片子目录及已有遮罩的命名；`a.png` 和 `a.jpg.png` 均沿用训练器的查找规则。
+- 输出为原始栅格尺寸的 8 位灰度 PNG；不按 EXIF 旋转。白色 255 表示完整权重，黑色 0 表示不参与，灰色表示部分权重。
+- 训练页面无需单独的实焦开关；保留默认的“使用数据集遮罩”即可。训练读取 `masks/`，不读取旧 `focus/`。
+
+## 备份与重复生成
+
+开始逐图计算前，先备份本次所有原 masks。原文件的完整字节保存在
+`.spirula-focus/original_masks/<SHA-256>/<原相对路径>`，逐图记录在
+`.spirula-focus/records/`。原来无文件的图片也会有记录。
+不要删除 `.spirula-focus/`，否则会丢失原始遮罩及防止重复压暗所需的状态。
+
+每次重新生成都从备份原遮罩重新相乘，不会将本工具上次的结果继续相乘。
+如果用户在生成后重新用 SAM3 等工具修改了 masks，文件哈希变化会把这份新遮罩作为新原始遮罩备份。
+计算期间若 masks 被其他程序改写，当前图片会报错并拒绝覆盖。
+PNG 与记录均通过临时文件替换，记录同时保留写入前与待写入哈希，可识别中断的写回。
+
+原遮罩与照片尺寸必须相同，避免悄悄拉伸导致错位；尺寸不同时报错，原始备份保留。
+恢复时可按逐图 JSON 中的 `output` / `original` 相对路径拷回原文件；`original` 为空表示原来没有遮罩。
+
+## 训练如何使用灰度
+
+数据读取器保留 masks 的 0–255 灰度，不再把所有非零像素变成 1。
+合并图片 alpha 通道时只进一步屏蔽无效区域。训练内部将遮罩拆成非零支持区域及连续权重，
+CUDA 与 Vulkan 共用同一训练流程：RGB 光度梯度乘以 `mask / 255`，用于增密的误差图也乘以该权重。
+例如同等误差下灰度 51 的像素，其 RGB 梯度只有灰度 255 的约 20%。
+深度、法线监督和几何正则不作为实焦算法的调参对象；原有训练选项保持其含义。
+这里加权的是实际优化梯度与增密误差图；日志中的原始损失标量仍按原有损失函数汇报。
+
+## 命令行与模型
+
+```text
+spirula focus <dataset> --allowed 1.4 --train-side 5760
+```
+
+读取 `depths/`，生成并合并 `masks/`。缺少深度时提示先执行 `spirula geometry --depth`。
+已有 masks 不会导致跳过生成。模型沿用 Spirula 的模型缓存或界面选定的模型路径，分发包不含深度模型。
 
 ## Method
 

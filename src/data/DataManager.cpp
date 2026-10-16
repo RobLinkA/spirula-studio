@@ -518,41 +518,7 @@ void apply_boundary_offset(uint8_t* mask, int h, int w, float fraction) {
     edt::apply_mask_boundary_offset_in_place(mask, h, w, offset_px);
 }
 
-void decode_mask_into(const std::string& path,
-                      int dst_h, int dst_w,
-                      bool flip,
-                      float boundary_offset_frac,
-                      uint8_t* dst,
-                      int turns_cw = 0)
-{
-    int w, h, ch;
-    stbi_uc* img = stbi_load(path.c_str(), &w, &h, &ch, 1);
-    if (!img) throw std::runtime_error(decode_failure(path));
-
-    // Binarize on-disk pixels first so the broadcast / resize always emits
-    // strict 0/1 (matches the kernel's bool semantics).
-    for (size_t i = 0; i < (size_t)w * h; ++i)
-        img[i] = (uint8_t)(img[i] != 0);
-
-    const stbi_uc* src = img;
-    std::vector<stbi_uc> turned;
-    turn_decoded(src, w, h, 1, turns_cw, turned);
-    if (w == dst_w && h == dst_h) {
-        std::memcpy(dst, src, (size_t)w * h);
-    } else {
-        cpu_nearest_resize_u8(src, h, w, dst, dst_h, dst_w);
-    }
-    stbi_image_free(img);
-
-    // Before the offset: a flipped mask's boundary is the one to grow or shrink.
-    if (flip)
-        for (size_t i = 0; i < (size_t)dst_h * dst_w; i++) dst[i] = (uint8_t)!dst[i];
-
-    apply_boundary_offset(dst, dst_h, dst_w, boundary_offset_frac);
-}
-
-// A focus/ weight map at dst_h x dst_w, bilinear: unlike a mask its values are
-// continuous, and nearest would print the photo-to-training scale as steps.
+// Preserve continuous mask weights when resampling to the decoded shape.
 void decode_weight_into(const std::string& path, int dst_h, int dst_w, uint8_t* dst,
                         int turns_cw = 0) {
     int w, h, ch;
@@ -561,6 +527,11 @@ void decode_weight_into(const std::string& path, int dst_h, int dst_w, uint8_t* 
     const stbi_uc* src = img;
     std::vector<stbi_uc> turned;
     turn_decoded(src, w, h, 1, turns_cw, turned);
+    if (w == dst_w && h == dst_h) {
+        std::memcpy(dst, src, (size_t)w * h);
+        stbi_image_free(img);
+        return;
+    }
     const float fx = (float)w / (float)dst_w, fy = (float)h / (float)dst_h;
     for (int y = 0; y < dst_h; ++y) {
         const float v = std::max(0.0f, ((float)y + 0.5f) * fy - 0.5f);
@@ -841,12 +812,7 @@ public:
     }
 
     bool has_masks()   const {
-        return (_cfg.load_masks && !_mask_filenames.empty()) || _has_synth_masks ||
-               weighted_masks();
-    }
-    bool weighted_masks() const { return !_cfg.focus_filenames.empty(); }
-    bool focus_of(int64_t i) const {
-        return weighted_masks() && !_cfg.focus_filenames[(size_t)i].empty();
+        return (_cfg.load_masks && !_mask_filenames.empty()) || _has_synth_masks;
     }
     bool has_depths()  const { return !_depth_filenames.empty()  && _cfg.load_depths; }
     bool has_normals() const { return !_normal_filenames.empty() && _cfg.load_normals; }
@@ -1013,13 +979,12 @@ private:
     }
     bool mask_present(int64_t i) const {
         return (!_mask_filenames.empty() && !_mask_filenames[(size_t)i].empty()) ||
-               alpha_mask(i) || focus_of(i) ||
+               alpha_mask(i) ||
                (!_synth_white_mask.empty() && _synth_white_mask[(size_t)i]);
     }
     // Image i's mask at dst_h x dst_w, from whichever of mask_present's
     // sources it has.
     void decode_mask_of(int64_t i, int dst_h, int dst_w, uint8_t* dst) const;
-    void decode_binary_mask_of(int64_t i, int dst_h, int dst_w, uint8_t* dst) const;
 
     // ---- Setup helpers ---------------------------------------------------
     void probe_dtypes();
@@ -1219,7 +1184,7 @@ DataManagerImpl::DataManagerImpl(
         // Ensure _mask_filenames is sized to N so per-image lookups below
         // are valid (entries for synthesized slots stay empty strings,
         // which the probe / decode paths special-case).
-        if ((_has_synth_masks || _has_alpha_masks || weighted_masks()) && _mask_filenames.empty()) {
+        if ((_has_synth_masks || _has_alpha_masks) && _mask_filenames.empty()) {
             _mask_filenames.assign((size_t)N, std::string());
         }
     }
@@ -1332,17 +1297,6 @@ void DataManagerImpl::probe_dtypes() {
             _mask_w_per[(size_t)i] = _widths[(size_t)i];
         }
     }
-    if (weighted_masks()) {
-        if (_mask_h_per.empty()) _mask_h_per.assign((size_t)N, 0);
-        if (_mask_w_per.empty()) _mask_w_per.assign((size_t)N, 0);
-        for (int64_t i = 0; i < N; ++i) {
-            if (!focus_of(i)) continue;
-            const int64_t area = (int64_t)_mask_h_per[(size_t)i] * _mask_w_per[(size_t)i];
-            if (area >= (int64_t)_heights[(size_t)i] * _widths[(size_t)i]) continue;
-            _mask_h_per[(size_t)i] = _heights[(size_t)i];
-            _mask_w_per[(size_t)i] = _widths[(size_t)i];
-        }
-    }
     if (has_depths())  probe_per_image(_depth_filenames,  "depth",  _depth_h_per,  _depth_w_per);
     if (has_normals()) probe_per_image(_normal_filenames, "normal", _normal_h_per, _normal_w_per);
 }
@@ -1369,33 +1323,27 @@ void DataManagerImpl::warn_mask_aspect() const {
 
 void DataManagerImpl::decode_mask_of(int64_t i, int dst_h, int dst_w,
                                      uint8_t* dst) const {
-    decode_binary_mask_of(i, dst_h, dst_w, dst);
-    if (!weighted_masks()) return;
-    const size_t n = (size_t)dst_h * dst_w;
-    for (size_t k = 0; k < n; ++k) dst[k] = dst[k] ? 255 : 0;
-    if (!focus_of(i)) return;
-    std::vector<uint8_t> w(n);
-    decode_weight_into(_cfg.focus_filenames[(size_t)i], dst_h, dst_w, w.data(), turns_of(i));
-    for (size_t k = 0; k < n; ++k) dst[k] = (uint8_t)((dst[k] * w[k] + 127) / 255);
-}
-
-void DataManagerImpl::decode_binary_mask_of(int64_t i, int dst_h, int dst_w,
-                                            uint8_t* dst) const {
     const std::string file = _mask_filenames.empty() ? std::string() : _mask_filenames[(size_t)i];
     const int turns = turns_of(i);
-    if (!alpha_mask(i)) {
-        if (file.empty()) std::memset(dst, 1, (size_t)dst_h * dst_w);
-        else decode_mask_into(file, dst_h, dst_w, _cfg.flip_mask,
-                              _cfg.mask_boundary_offset, dst, turns);
-        return;
+    const size_t n = (size_t)dst_h * dst_w;
+    if (file.empty()) std::memset(dst, 255, n);
+    else {
+        decode_weight_into(file, dst_h, dst_w, dst, turns);
+        if (_cfg.flip_mask)
+            for (size_t k = 0; k < n; ++k) dst[k] = 255 - dst[k];
     }
-    decode_alpha_mask_into(_image_filenames[(size_t)i], dst_h, dst_w, dst, turns);
-    if (!file.empty()) {
-        std::vector<uint8_t> other((size_t)dst_h * dst_w);
-        decode_mask_into(file, dst_h, dst_w, _cfg.flip_mask, 0.0f, other.data(), turns);
-        for (size_t k = 0; k < other.size(); ++k) dst[k] &= other[k];
+    if (alpha_mask(i)) {
+        std::vector<uint8_t> alpha(n);
+        decode_alpha_mask_into(_image_filenames[(size_t)i], dst_h, dst_w, alpha.data(), turns);
+        for (size_t k = 0; k < n; ++k) if (!alpha[k]) dst[k] = 0;
     }
-    apply_boundary_offset(dst, dst_h, dst_w, _cfg.mask_boundary_offset);
+    if (_cfg.mask_boundary_offset != 0.0f) {
+        std::vector<uint8_t> support(n);
+        for (size_t k = 0; k < n; ++k) support[k] = dst[k] != 0;
+        apply_boundary_offset(support.data(), dst_h, dst_w, _cfg.mask_boundary_offset);
+        for (size_t k = 0; k < n; ++k)
+            dst[k] = support[k] ? (dst[k] ? dst[k] : 255) : 0;
+    }
 }
 
 
@@ -1855,8 +1803,7 @@ void DataManagerImpl::fill_batch_from_cache(DecodedBatch& b) {
             uint8_t* dst_row = b.mask_buffer.data() + (size_t)j * mask_row;
             int32_t  ih = _mask_h_per[i], iw = _mask_w_per[i];
             if (ih == 1 && iw == 1) {
-                std::memset(dst_row, weighted_masks() ? _mask_cache[i][0]
-                                                      : (_mask_cache[i][0] ? 1 : 0), mask_row);
+                std::memset(dst_row, _mask_cache[i][0], mask_row);
             } else if (ih == b.mask_height && iw == b.mask_width) {
                 std::memcpy(dst_row, _mask_cache[i].data(), mask_row);
             } else {

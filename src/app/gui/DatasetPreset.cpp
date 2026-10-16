@@ -241,6 +241,7 @@ void sanitize_dataset_settings(DatasetSettings& s) {
     GeometryJob& g = s.sfm.geometry;
     clamp_to(g.max_size, 64, 8192);
     clamp_to(g.num_tokens, 0, 100000);
+    g.focus_allowed = std::clamp(g.focus_allowed, 0.2f, 8.0f);
     clamp_to(g.jpeg_quality, 1, 100);
     clamp_to(g.ray_depth, 0, 2);
     clamp_to(g.split, 0, 2);

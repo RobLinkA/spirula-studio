@@ -25,60 +25,19 @@ SS_MSG(tagline,
     TR("Bir veri kümesi için piksel başına odak ağırlıkları: her piksel ne kadar net"));
 
 SS_MSG(usage_target,
-    EN("The dataset folder. Reads depths/ (from `geometry --depth`), measures "
-       "edge blur in each photo, fits how blur grows away from the focal plane "
-       "and writes 8-bit weights to focus/: white counts fully in training, "
-       "black not at all. Training multiplies them into masks/."),
-    JA("データセットのフォルダです。depths/（`geometry --depth` の出力）を読み、"
-       "各写真のエッジのぼけを測り、焦点面から離れるにつれてぼけが増える様子を"
-       "当てはめ、8 ビットの重みを focus/ に書き出します。白は学習で完全に使われ、"
-       "黒は使われません。学習時に masks/ と掛け合わされます。"),
-    ZH_HANS("数据集文件夹。读取 depths/（来自 `geometry --depth`），测量每张照片的"
-            "边缘模糊，拟合模糊随离开焦平面而增长的规律，并把 8 位权重写入 focus/："
-            "白色在训练中完全计入，黑色完全不计入。训练时会与 masks/ 相乘。"),
-    ZH_HANT("資料集資料夾。讀取 depths/（來自 `geometry --depth`），量測每張照片的"
-            "邊緣模糊，擬合模糊隨離開焦平面而增長的規律，並把 8 位元權重寫入 focus/："
-            "白色在訓練中完全計入，黑色完全不計入。訓練時會與 masks/ 相乘。"),
-    KO("데이터셋 폴더입니다. depths/(`geometry --depth` 출력)를 읽고, 각 사진의 "
-       "가장자리 흐림을 측정해 초점면에서 멀어질수록 흐림이 커지는 정도를 맞춘 뒤 "
-       "8비트 가중치를 focus/ 에 씁니다. 흰색은 학습에 완전히 반영되고 검은색은 "
-       "반영되지 않습니다. 학습 시 masks/ 와 곱해집니다."),
-    DE("Der Datensatzordner. Liest depths/ (aus `geometry --depth`), misst die "
-       "Kantenunschärfe jedes Fotos, passt an, wie die Unschärfe abseits der "
-       "Fokusebene wächst, und schreibt 8-Bit-Gewichte nach focus/: Weiß zählt "
-       "im Training voll, Schwarz gar nicht. Das Training multipliziert sie in "
-       "masks/ hinein."),
-    FR("Le dossier du jeu de données. Lit depths/ (issu de `geometry --depth`), "
-       "mesure le flou des contours de chaque photo, ajuste la croissance du flou "
-       "loin du plan de netteté et écrit des poids 8 bits dans focus/ : le blanc "
-       "compte pleinement à l'entraînement, le noir pas du tout. L'entraînement "
-       "les multiplie aux masks/."),
-    ES("La carpeta del conjunto. Lee depths/ (de `geometry --depth`), mide el "
-       "desenfoque de los bordes de cada foto, ajusta cómo crece al alejarse del "
-       "plano de enfoque y escribe pesos de 8 bits en focus/: el blanco cuenta "
-       "por completo en el entrenamiento y el negro nada. El entrenamiento los "
-       "multiplica por masks/."),
-    PT("A pasta do conjunto. Lê depths/ (de `geometry --depth`), mede o desfoque "
-       "das arestas de cada foto, ajusta como ele cresce longe do plano de foco e "
-       "escreve pesos de 8 bits em focus/: o branco conta por inteiro no treino e "
-       "o preto nada. O treino multiplica-os pelas masks/."),
-    IT("La cartella dell'insieme. Legge depths/ (da `geometry --depth`), misura "
-       "la sfocatura dei bordi di ogni foto, adatta come cresce lontano dal piano "
-       "di fuoco e scrive pesi a 8 bit in focus/: il bianco conta del tutto "
-       "nell'addestramento, il nero per niente. L'addestramento li moltiplica "
-       "per masks/."),
-    NL("De datasetmap. Leest depths/ (uit `geometry --depth`), meet de randonscherpte "
-       "in elke foto, past aan hoe die groeit buiten het scherpstelvlak en schrijft "
-       "8-bits gewichten naar focus/: wit telt volledig mee in de training, zwart "
-       "helemaal niet. De training vermenigvuldigt ze met masks/."),
-    RU("Папка набора. Читает depths/ (из `geometry --depth`), измеряет размытие "
-       "краёв на каждом снимке, подбирает, как оно растёт вдали от плоскости "
-       "фокусировки, и пишет 8-битные веса в focus/: белое учитывается в обучении "
-       "полностью, чёрное — никак. При обучении они умножаются на masks/."),
-    TR("Veri kümesi klasörü. depths/ (`geometry --depth` çıktısı) okunur, her "
-       "fotoğraftaki kenar bulanıklığı ölçülür, odak düzleminden uzaklaştıkça "
-       "nasıl arttığı uydurulur ve 8 bit ağırlıklar focus/ içine yazılır: beyaz "
-       "eğitimde tam sayılır, siyah hiç sayılmaz. Eğitim bunları masks/ ile çarpar."));
+    EN("Merge focus confidence into masks/ after backing up original masks. Missing masks count as white. Training reads the merged grayscale masks automatically; no training switch is needed."),
+    JA("元のマスクをバックアップして合焦信頼度を masks/ に乗算します。マスクがなければ白として扱います。学習は統合済みのグレースケールマスクを自動で読みます。"),
+    ZH_HANS("先备份原遮罩，再将实焦置信度乘入 masks/；没有原遮罩时按全白处理。训练自动读取合并后的灰度遮罩，无需额外开关。"),
+    ZH_HANT("先備份原遮罩，再將實焦置信度乘入 masks/；沒有原遮罩時按全白處理。訓練自動讀取合併後的灰階遮罩，無需額外開關。"),
+    KO("원본 마스크를 백업한 뒤 초점 신뢰도를 masks/ 에 곱합니다. 마스크가 없으면 흰색으로 처리합니다. 학습은 병합된 회색조 마스크를 자동으로 읽습니다."),
+    DE("Fokusgewichte nach Sicherung der Originalmasken mit masks/ multiplizieren. Fehlende Masken gelten als weiß. Das Training liest die Graustufenmasken automatisch."),
+    FR("Sauvegarde les masques puis multiplie la confiance de netteté dans masks/. Un masque absent vaut blanc. L’entraînement lit automatiquement les masques en niveaux de gris."),
+    ES("Respalda las máscaras y multiplica la confianza de enfoque en masks/. Sin máscara se usa blanco. El entrenamiento lee automáticamente las máscaras en escala de grises."),
+    PT("Salva as máscaras originais e multiplica a confiança de foco em masks/. Máscaras ausentes valem branco. O treino lê automaticamente as máscaras em tons de cinza."),
+    IT("Salva le maschere originali e moltiplica la confidenza di fuoco in masks/. Le maschere assenti valgono bianco. L’addestramento legge automaticamente le maschere in scala di grigi."),
+    NL("Maakt een reservekopie en vermenigvuldigt focusgewichten met masks/. Ontbrekende maskers gelden als wit. De training leest de grijswaardenmaskers automatisch."),
+    RU("Сохраняет исходные маски и умножает веса резкости на masks/. Отсутствующая маска считается белой. Обучение автоматически читает маски в градациях серого."),
+    TR("Özgün maskeleri yedekler ve odak güvenini masks/ ile çarpar. Eksik maske beyaz sayılır. Eğitim birleştirilmiş gri tonlu maskeleri otomatik okur."));
 
 SS_MSG(opt_depth_dir,
     EN("Depth maps, relative to the dataset (default depths)"),
@@ -96,19 +55,19 @@ SS_MSG(opt_depth_dir,
     TR("Derinlik haritaları, veri kümesine göre (varsayılan depths)"));
 
 SS_MSG(opt_out_dir,
-    EN("Where the weights go, relative to the dataset (default focus)"),
-    JA("重みの書き出し先。データセットからの相対パス（既定 focus）"),
-    ZH_HANS("权重的输出位置，相对于数据集（默认 focus）"),
-    ZH_HANT("權重的輸出位置，相對於資料集（預設 focus）"),
-    KO("가중치를 쓸 위치, 데이터셋 기준 상대 경로 (기본값 focus)"),
-    DE("Ziel der Gewichte, relativ zum Datensatz (Standard focus)"),
-    FR("Destination des poids, relative au jeu de données (défaut focus)"),
-    ES("Destino de los pesos, relativo al conjunto (por defecto focus)"),
-    PT("Destino dos pesos, relativo ao conjunto (padrão focus)"),
-    IT("Destinazione dei pesi, relativa all'insieme (predefinito focus)"),
-    NL("Doel van de gewichten, relatief aan de dataset (standaard focus)"),
-    RU("Куда писать веса, относительно набора (по умолчанию focus)"),
-    TR("Ağırlıkların yazılacağı yer, veri kümesine göre (varsayılan focus)"));
+    EN("Where the weights go, relative to the dataset (default masks)"),
+    JA("重みの書き出し先。データセットからの相対パス（既定 masks）"),
+    ZH_HANS("权重的输出位置，相对于数据集（默认 masks）"),
+    ZH_HANT("權重的輸出位置，相對於資料集（預設 masks）"),
+    KO("가중치를 쓸 위치, 데이터셋 기준 상대 경로 (기본값 masks)"),
+    DE("Ziel der Gewichte, relativ zum Datensatz (Standard masks)"),
+    FR("Destination des poids, relative au jeu de données (défaut masks)"),
+    ES("Destino de los pesos, relativo al conjunto (por defecto masks)"),
+    PT("Destino dos pesos, relativo ao conjunto (padrão masks)"),
+    IT("Destinazione dei pesi, relativa all'insieme (predefinito masks)"),
+    NL("Doel van de gewichten, relatief aan de dataset (standaard masks)"),
+    RU("Куда писать веса, относительно набора (по умолчанию masks)"),
+    TR("Ağırlıkların yazılacağı yer, veri kümesine göre (varsayılan masks)"));
 
 SS_MSG(opt_allowed,
     EN("Defocus blur allowed before a pixel loses weight, in pixels at the "

@@ -755,6 +755,7 @@ void GuiApp::write_run_settings(std::ofstream& f) {
     line("model", _geometry.model);
     line("want_depth", cfg_str(_geometry.want_depth));
     line("want_focus", cfg_str(_geometry.want_focus));
+    line("focus_allowed", std::to_string(_geometry.focus_allowed));
     line("want_normal", cfg_str(_geometry.want_normal));
     line("max_size", std::to_string(_geometry.max_size));
     line("face_res", _geometry.face_res == 1 ? "source" : "output");
@@ -11155,17 +11156,6 @@ void GuiApp::draw_basic_options() {
     if (ui::Checkbox(msg::opt_ppisp, &_cfg.use_ppisp))
         _cfg_ui.touched.insert("use_ppisp");
     ui::help_on_hover(msg::opt_ppisp_help);
-
-    bool use_focus = !_cfg.focus_dir.empty();
-    if (ui::Checkbox(msg::opt_use_focus, &use_focus)) {
-        _cfg.focus_dir = use_focus ? "focus" : "";
-        _cfg_ui.touched.insert("focus_dir");
-    }
-    ui::help_on_hover(msg::opt_use_focus_help);
-
-    if (ui::Checkbox(fld::export_y_up, &_cfg.export_y_up))
-        _cfg_ui.touched.insert("export_y_up");
-    ui::help_on_hover(fld::export_y_up_help);
 
     ImGui::Spacing();
 

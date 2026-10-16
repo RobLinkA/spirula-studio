@@ -1,10 +1,10 @@
-// `spirula focus` -- per-pixel focus weights for a dataset, written to focus/
-// beside the images. Reads the depth `spirula geometry --depth` wrote; the
-// method is app/FocusWeight.h, the numbers behind it docs/notes/focus-weights.md.
+// `spirula focus` merges per-pixel focus weights into the dataset's masks/.
 
 #include "app/Tools.h"
 
 #include "app/FocusWeight.h"
+#include "app/FocusMaskMerge.h"
+#include "core/FileLock.h"
 #include "data/DatasetParser.h"
 #include "i18n/Message.h"
 #include "i18n/catalog/Focus.h"
@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <set>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -31,7 +32,7 @@ struct Options {
     std::string dataset;
     std::string image_dir = "images";
     std::string depth_dir = "depths";
-    std::string out_dir = "focus";
+    std::string out_dir = "masks";
     app::FocusSettings focus;
     bool overwrite = false;
 };
@@ -116,6 +117,8 @@ int spirula_focus_main(int argc, char** argv) {
         cfg.image_dir = o.image_dir;
         const ParsedDataset ds = parse_dataset(o.dataset, cfg, "");
         const fs::path root(o.dataset);
+        fs::create_directories(root / ".spirula-focus");
+        const spirula::FileLock lock(root / ".spirula-focus" / "run.lock");
         const fs::path image_root = root / cfg.image_dir;
         std::error_code ec;
         auto rel_of = [&](const std::string& image, const char* ext) {
@@ -124,11 +127,18 @@ int spirula_focus_main(int argc, char** argv) {
             return rel.replace_extension(ext);
         };
 
+        std::vector<app::FocusMaskTarget> targets;
+        std::set<fs::path> outputs;
+        for (const auto& image : ds.image_filenames) {
+            const std::string rel = dsparse::relative_under(image, image_root.string());
+            if (rel.empty()) throw std::runtime_error("image is outside the image directory");
+            auto target = app::prepare_focus_mask(root, root / o.out_dir, rel);
+            if (!outputs.insert(target.output).second) throw std::runtime_error("images share a mask filename");
+            targets.push_back(std::move(target));
+        }
         int64_t written = 0, skipped = 0, no_depth = 0;
         for (size_t i = 0; i < ds.image_filenames.size(); ++i) {
             const std::string& image = ds.image_filenames[i];
-            const fs::path out = root / o.out_dir / rel_of(image, ".png");
-            if (!o.overwrite && fs::exists(out, ec)) { ++skipped; continue; }
             const fs::path dpath = root / o.depth_dir / rel_of(image, ".png");
             int dw = 0, dh = 0;
             const std::vector<float> u = read_inverse_depth(dpath.string(), dw, dh);
@@ -141,7 +151,7 @@ int spirula_focus_main(int argc, char** argv) {
                 continue;
             }
             const nn::Image img = nn::load_image(image);
-            if (img.empty()) continue;
+            if (img.empty()) throw std::runtime_error("cannot read image: " + image);
             const int f = app::focus_measure_factor(img.width, img.height);
             int mw = 0, mh = 0;
             const std::vector<float> gray = app::gray_downsampled(img.data.data(), img.width, img.height, f, mw, mh);
@@ -154,8 +164,7 @@ int spirula_focus_main(int argc, char** argv) {
                 std::fprintf(stderr, "%s\n", format(F::warn_no_fit, {fs::path(image).filename().string()}).c_str());
                 weight.assign((size_t)img.width * img.height, 255);
             }
-            fs::create_directories(out.parent_path(), ec);
-            if (!nn::save_gray_png(weight.data(), img.width, img.height, out.string())) continue;
+            app::write_focus_mask(targets[i], weight, img.width, img.height);
             double mean = 0;
             for (uint8_t v : weight) mean += v;
             mean /= 255.0 * (double)weight.size();
@@ -169,7 +178,7 @@ int spirula_focus_main(int argc, char** argv) {
             ++written;
         }
         std::printf("%s\n", format(F::log_done, {(long long)written, (long long)skipped, (long long)no_depth}).c_str());
-        return no_depth > 0 && written == 0 ? 1 : 0;
+        return no_depth > 0 ? 1 : 0;
     } catch (const std::exception& e) {
         std::fprintf(stderr, "\nerror: %s\n", e.what());
         return 1;
